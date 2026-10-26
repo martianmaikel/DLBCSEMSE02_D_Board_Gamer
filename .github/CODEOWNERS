@@ -1,0 +1,4 @@
+# Owner werden bei PRs automatisch als Reviewer angefragt.
+/src/view/        @KPardis
+/src/controller/  @martianmaikel
+/src/model/       @Msaf777
