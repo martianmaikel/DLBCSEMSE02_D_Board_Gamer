@@ -1,0 +1,14 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@model": ["./src/model"],
+      "@model/*": ["./src/model/*"],
+      "@controller": ["./src/controller"],
+      "@controller/*": ["./src/controller/*"],
+      "@view": ["./src/view"],
+      "@view/*": ["./src/view/*"]
+    }
+  }
+}
