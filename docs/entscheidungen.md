@@ -36,3 +36,14 @@ Format: Datum, Entscheidung, Begründung, Alternativen, wer.
   Lösungen sollen wegen Plagiatsprüfung nicht geteilt werden. Das Repo ist öffentlich, damit der
   Tutor Einblick in den Code hat.
 - **Wer:** Maikel
+
+### E-005 · 2026-10-27 · Supabase als Backend-as-a-Service
+
+- **Begründung**: PostgreSQL passt zu den Beziehungen zwischen Accounts, Gruppen, Terminen,
+  Abstimmungen und Bewertungen. Integrierte Authentifizierung und automatisch bereitgestellte
+  APIs reduzieren den Backend-Aufwand. Das Team nutzt Supabase Cloud ohne lokale
+  Backend-Einrichtung; Mohammad plant zusätzlich eine separate lokale Supabase-Umgebung
+  über Docker für Entwicklung und Tests.
+- **Alternativen:** Firebase, eigener REST-Server mit Express und Prisma.
+
+- **Wer:** Mohammad nach Abstimmung mit dem Team
