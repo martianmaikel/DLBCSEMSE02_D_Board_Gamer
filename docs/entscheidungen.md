@@ -47,3 +47,12 @@ Format: Datum, Entscheidung, Begründung, Alternativen, wer.
 - **Alternativen:** Firebase, eigener REST-Server mit Express und Prisma.
 
 - **Wer:** Mohammad nach Abstimmung mit dem Team
+
+### E-006 · 2026-10-30 · Manuelles Deployment der Datenbankmigrationen
+
+- **Entscheidung:** Mohammad übernimmt das Deployment auf Supabase Cloud.
+  Übertragen werden lokal getestete Migrationen aus `main`, nachdem der zugehörige Pull Request geprüft, freigegeben und gemergt wurde.
+- **Begründung:** Die Zuständigkeit entspricht der Model-Verantwortung.
+  Der Ablauf hält Review und Deployment nachvollziehbar und benötigt in der aktuellen Projektphase keine zusätzliche GitHub-Integration.
+- **Alternativen:** Automatisches Deployment aus `main` über die Supabase-GitHub-Integration oder GitHub Actions. Bei wachsendem Bedarf erneut bewerten.
+- **Wer:** Mohammad.

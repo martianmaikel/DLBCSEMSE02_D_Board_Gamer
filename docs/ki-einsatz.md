@@ -14,3 +14,4 @@ Regeln:
 | ---------- | -------- | ----------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------- |
 | 2026-10-26 | Maikel   | Claude Code | Projekt-Setup: Expo-Projekt, MVC-Ordner, ESLint-Schichtregeln, CI, Git-Strategie, Doku | Struktur und Doku übernommen, Feature-Code bewusst nicht generiert                      |           |
 | 2026-10-29 | Mohammad | Codex       | Supabase-Setup: Cloud, lokale Docker-Umgebung, Model-Client, Doku                      | Befehle und Client-Code übernommen, Einrichtung manuell durchgeführt, Doku überarbeitet |           |
+| 2026-10-30 | Mohammad | Codex       | Supabase-Review: CLI, lokale Dienste und Dokumentation                                 | Review-Vorschläge manuell umgesetzt, Anleitung und Entscheidungslog überarbeitet        |           |

@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --passWithNoTests",
     "format": "prettier --write .",
-    "check": "npm run lint && npm run typecheck && npm test"
+    "check": "npm run lint && npm run typecheck && npm test",
+    "supabase": "npx --yes supabase@2.122.0"
   },
   "jest": {
     "preset": "jest-expo",
@@ -38,7 +39,6 @@
     "jest": "~30.5.2",
     "jest-expo": "~58.0.12",
     "prettier": "^3.9.10",
-    "supabase": "2.122.0",
     "typescript": "~6.0.3"
   },
   "private": true
