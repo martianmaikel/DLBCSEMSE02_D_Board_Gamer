@@ -23,26 +23,33 @@ Voraussetzungen: Node.js LTS (22 oder neuer), Git, auf dem Handy die App **Expo 
 git clone https://github.com/martianmaikel/DLBCSEMSE02_D_Board_Gamer.git
 cd DLBCSEMSE02_D_Board_Gamer
 npm ci
+```
+
+Vor dem ersten App-Start [Supabase einrichten](docs/supabase.md).
+
+```bash
 npm start          # QR-Code mit Expo Go scannen
 ```
 
-| Befehl           | Zweck                             |
-| ---------------- | --------------------------------- |
-| `npm start`      | Dev-Server                        |
-| `npm run check`  | Lint + Typecheck + Tests (vor PR) |
-| `npm run format` | Code formatieren (Prettier)       |
+| Befehl           | Zweck                                    |
+| ---------------- | ---------------------------------------- |
+| `npm start`      | Dev-Server                               |
+| `npm run check`  | Lint + Typecheck + Tests (vor Commit/PR) |
+| `npm run format` | Code formatieren (Prettier)              |
 
 ## Struktur
 
-```
+```text
 src/
-  view/         Screens, Navigation, UI           -> nutzt @controller
-  controller/   Anwendungslogik                    -> nutzt @model
-  model/        Datenmodell, Persistenz
+  view/             Screens, Navigation, UI       -> nutzt @controller
+  controller/       Anwendungslogik               -> nutzt @model
+  model/            Datenmodell, Persistenz
+supabase/           Lokale Supabase-Konfiguration
 docs/
   konzept.md         User Stories, Annahmen, offene Punkte
   entscheidungen.md  Entscheidungslog
   ki-einsatz.md      Dokumentation des KI-Einsatzes
+  supabase.md        Supabase-Einrichtung
 ```
 
 Die Abhängigkeitsrichtung view -> controller -> model wird per ESLint geprüft.
