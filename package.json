@@ -12,10 +12,15 @@
     "test": "jest --passWithNoTests",
     "format": "prettier --write .",
     "check": "npm run lint && npm run typecheck && npm test",
-    "supabase": "npx --yes supabase@2.122.0"
+    "supabase": "npx --yes supabase@2.122.0",
+    "test:integration": "node --env-file=.env.integration.local node_modules/jest/bin/jest.js --config jest.integration.config.cjs --runInBand"
   },
   "jest": {
     "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "\\.integration\\.test\\.ts$"
+    ],
     "moduleNameMapper": {
       "^@(model|controller|view)$": "<rootDir>/src/$1",
       "^@(model|controller|view)/(.*)$": "<rootDir>/src/$1/$2"

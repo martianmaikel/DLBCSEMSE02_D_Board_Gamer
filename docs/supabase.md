@@ -3,6 +3,8 @@
 Das Team nutzt Supabase Cloud. Nur Mohammad (Model) entwickelt zusätzlich lokal mit Docker.
 Alle Befehle im Projektordner ausführen.
 
+Das aktuelle Schema ist im [Datenmodell für User Story 1](datenmodell.md) dargestellt.
+
 ## App einrichten
 
 Voraussetzung: Projekt heruntergeladen und `npm ci` ausgeführt
@@ -19,6 +21,19 @@ npm start
 `.env.local` wird von Git ignoriert. Nach jeder Änderung die App vollständig neu laden.
 Für den Team-Alltag ist kein Docker nötig. Die Cloud-Datenbank ist gemeinsam;
 Änderungen an Testdaten können auch die anderen betreffen.
+
+## Übergabe an Controller und View
+
+Der Controller nutzt die Funktionen aus `@model`:
+
+- `signIn(email, password)`: vorhandenes Konto anmelden; liefert `id` und `email`.
+- `getGroupsForUser(user.id)`: eigene Gruppen laden.
+- `getSessionsForGroup(group.id)`: Sessions mit Ort laden, aufsteigend nach
+  `starts_at` sortiert. Der Controller wählt die nächste Session.
+
+Die View bindet Anmeldung und Anzeige über den Controller an.
+Lesen erfordert Anmeldung und Gruppenmitgliedschaft. Leere Ergebnisse sind `[]`;
+Fehler werden geworfen und im Controller behandelt.
 
 ## Lokal entwickeln · Model
 
@@ -110,9 +125,44 @@ npm run supabase -- db push
 Schemaänderungen nicht direkt im Cloud-Dashboard vornehmen. Bei widersprüchlichen Migrationen
 stoppen und die Historien vergleichen, nicht die Cloud zurücksetzen oder Migrationen löschen.
 
-Übertragen werden Migrationen, nicht automatisch lokale Testdaten oder Benutzerkonten.
+Migrationen übertragen keine Benutzerkonten oder Testdaten.
+Nach dem Deployment stellt Mohammad bestätigte Testkonten und eine Testgruppe
+mit Mitgliedschaften, Ort und Session-Terminen bereit.
+Die Zugangsdaten werden privat geteilt.
 
 Weiterführend:
 [Lokale Entwicklung](https://supabase.com/docs/guides/local-development/overview),
 [Cloud-Migrationen](https://supabase.com/docs/guides/deployment/database-migrations),
 [Expo-Umgebungsvariablen](https://docs.expo.dev/guides/environment-variables/).
+
+## Integrationstests · Model
+
+Die Integrationstests prüfen die Model-Abfragen gegen die lokale
+Supabase-Instanz. Sie benötigen Docker, laufendes Supabase und die
+angewendeten lokalen Migrationen.
+
+In `.env.integration.local` die lokalen Werte aus
+`npm run supabase -- status -o env` eintragen:
+
+```dotenv
+SUPABASE_TEST_URL=http://127.0.0.1:54321
+SUPABASE_TEST_ANON_KEY=<lokaler ANON_KEY>
+SUPABASE_TEST_SERVICE_ROLE_KEY=<lokaler SERVICE_ROLE_KEY>
+```
+
+Die Datei wird von Git ignoriert. Der Service-Role-Key wird nur zur
+Vorbereitung und Bereinigung der Testdaten verwendet. Die Lesetests verwenden
+den Anon-Key mit echten Benutzersitzungen. Weitere Anfragen ohne Anmeldung
+prüfen die Zugriffssperre.
+
+```bash
+npm run test:integration
+```
+
+Die Tests erstellen eigene Daten und entfernen sie anschließend. Sie prüfen
+die Model-Anmeldung, Gruppenfilter, Session-Reihenfolge, zugehörige Orte und
+RLS einschließlich gesperrter Schreibzugriffe. Die mobile Clientinitialisierung
+und die Anmeldeoberfläche werden dabei nicht geprüft.
+
+`npm test` und `npm run check` schließen Integrationstests aus und
+benötigen keine lokale Supabase-Instanz.
