@@ -4,3 +4,5 @@ export { getGroupsForUser } from './groups';
 export type { Group } from './groups';
 export { getSessionsForGroup } from './sessions';
 export type { SessionWithLocation } from './sessions';
+export { signIn } from './auth';
+export type { AuthUser } from './auth';

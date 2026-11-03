@@ -7,6 +7,9 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 import { getGroupsForUser } from './groups';
 import { getSessionsForGroup } from './sessions';
+import { supabase } from './supabase';
+
+import { signIn } from './auth';
 
 // Replace native initialization with a real Node-compatible client.
 jest.mock('./supabase', () => {
@@ -40,8 +43,9 @@ jest.mock('./supabase', () => {
 
 const url = process.env.SUPABASE_TEST_URL;
 const adminKey = process.env.SUPABASE_TEST_SERVICE_ROLE_KEY;
+const publicKey = process.env.SUPABASE_TEST_ANON_KEY;
 
-if (!url || !adminKey) {
+if (!url || !adminKey || !publicKey) {
   throw new Error('Missing local integration fixture configuration');
 }
 
@@ -52,6 +56,21 @@ const admin = createClient<Database>(url, adminKey, {
     detectSessionInUrl: false,
   },
 });
+
+const testClientOptions = {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false,
+  },
+};
+
+const otherClient = createClient<Database>(url, publicKey, testClientOptions);
+const anonymousClient = createClient<Database>(url, publicKey, testClientOptions);
+
+const userEmail = `integration-${randomUUID()}@example.com`;
+const otherUserEmail = `integration-other-${randomUUID()}@example.com`;
+const testPassword = randomUUID();
 
 const groupA = randomUUID();
 const groupB = randomUUID();
@@ -71,8 +90,8 @@ let otherUserId: string | undefined;
 describe('Model integration with local Supabase', () => {
   beforeAll(async () => {
     const { data, error } = await admin.auth.admin.createUser({
-      email: `integration-${randomUUID()}@example.com`,
-      password: randomUUID(),
+      email: userEmail,
+      password: testPassword,
       email_confirm: true,
     });
 
@@ -87,8 +106,8 @@ describe('Model integration with local Supabase', () => {
     userId = data.user.id;
 
     const { data: otherData, error: otherError } = await admin.auth.admin.createUser({
-      email: `integration-other-${randomUUID()}@example.com`,
-      password: randomUUID(),
+      email: otherUserEmail,
+      password: testPassword,
       email_confirm: true,
     });
 
@@ -160,6 +179,16 @@ describe('Model integration with local Supabase', () => {
         },
       ])
       .throwOnError();
+    await signIn(userEmail, testPassword);
+
+    const { error: otherSignInError } = await otherClient.auth.signInWithPassword({
+      email: otherUserEmail,
+      password: testPassword,
+    });
+
+    if (otherSignInError) {
+      throw otherSignInError;
+    }
   });
 
   afterAll(async () => {
@@ -243,5 +272,93 @@ describe('Model integration with local Supabase', () => {
     const sessions = await getSessionsForGroup(groupB);
 
     expect(sessions).toEqual([]);
+  });
+  it('hides another user’s group data', async () => {
+    if (!otherUserId) {
+      throw new Error('Second test user was not initialized');
+    }
+
+    const results = await Promise.all([
+      supabase.from('groups').select('id').eq('id', otherGroup),
+      supabase.from('memberships').select('id').eq('user_id', otherUserId),
+      supabase.from('locations').select('id').eq('id', otherLocation),
+      supabase.from('sessions').select('id').eq('id', otherSession),
+    ]);
+
+    for (const { data, error } of results) {
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
+    }
+
+    await expect(getGroupsForUser(otherUserId)).resolves.toEqual([]);
+    await expect(getSessionsForGroup(otherGroup)).resolves.toEqual([]);
+
+    const { data, error } = await otherClient.from('groups').select('id').eq('id', otherGroup);
+
+    expect(error).toBeNull();
+    expect(data).toEqual([{ id: otherGroup }]);
+  });
+  it('denies reads without a signed-in user', async () => {
+    const results = await Promise.all([
+      anonymousClient.from('groups').select('id').limit(1),
+      anonymousClient.from('memberships').select('id').limit(1),
+      anonymousClient.from('locations').select('id').limit(1),
+      anonymousClient.from('sessions').select('id').limit(1),
+    ]);
+
+    for (const { error } of results) {
+      expect(error?.code).toBe('42501');
+    }
+  });
+  it('denies application writes', async () => {
+    if (!userId) {
+      throw new Error('Test user was not initialized');
+    }
+
+    for (const client of [supabase, anonymousClient]) {
+      const results = await Promise.all([
+        client.from('groups').insert({
+          id: groupA,
+          name: 'Integration A',
+        }),
+        client.from('groups').update({ name: 'Integration A' }).eq('id', groupA),
+        client.from('groups').delete().eq('id', groupA),
+
+        client.from('memberships').insert({
+          group_id: groupA,
+          user_id: userId,
+        }),
+        client
+          .from('memberships')
+          .update({ group_id: groupA })
+          .eq('group_id', groupA)
+          .eq('user_id', userId),
+        client.from('memberships').delete().eq('group_id', groupA).eq('user_id', userId),
+
+        client.from('locations').insert({
+          id: locationA,
+          group_id: groupA,
+          address: 'Integration address A',
+        }),
+        client.from('locations').update({ address: 'Integration address A' }).eq('id', locationA),
+        client.from('locations').delete().eq('id', locationA),
+
+        client.from('sessions').insert({
+          id: earlySession,
+          group_id: groupA,
+          location_id: locationA,
+          starts_at: '2030-06-10T18:00:00Z',
+        }),
+        client
+          .from('sessions')
+          .update({ starts_at: '2030-06-10T18:00:00Z' })
+          .eq('id', earlySession),
+        client.from('sessions').delete().eq('id', earlySession),
+      ]);
+
+      for (const { error } of results) {
+        expect(error?.code).toBe('42501');
+      }
+    }
   });
 });
