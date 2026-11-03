@@ -116,3 +116,33 @@ Weiterführend:
 [Lokale Entwicklung](https://supabase.com/docs/guides/local-development/overview),
 [Cloud-Migrationen](https://supabase.com/docs/guides/deployment/database-migrations),
 [Expo-Umgebungsvariablen](https://docs.expo.dev/guides/environment-variables/).
+
+## Integrationstests · Model
+
+Die Integrationstests prüfen die Model-Abfragen gegen die lokale
+Supabase-Instanz. Sie benötigen Docker, laufendes Supabase und die
+angewendeten lokalen Migrationen.
+
+In `.env.integration.local` die lokalen Werte aus
+`npm run supabase -- status -o env` eintragen:
+
+```dotenv
+SUPABASE_TEST_URL=http://127.0.0.1:54321
+SUPABASE_TEST_ANON_KEY=<lokaler ANON_KEY>
+SUPABASE_TEST_SERVICE_ROLE_KEY=<lokaler SERVICE_ROLE_KEY>
+```
+
+Die Datei wird von Git ignoriert. Der Service-Role-Key wird nur zur
+Vorbereitung und Bereinigung der Testdaten verwendet. Die getesteten
+Lesezugriffe verwenden den Anon-Key.
+
+```bash
+npm run test:integration
+```
+
+Die Tests erstellen eigene Daten und entfernen sie anschließend.
+Sie prüfen Gruppenfilter, Session-Reihenfolge und zugehörige Orte.
+RLS und die Anmeldung im mobilen Client werden damit nicht geprüft.
+
+`npm test` und `npm run check` schließen Integrationstests aus und
+benötigen keine lokale Supabase-Instanz.
