@@ -1,6 +1,6 @@
 /// <reference types="jest" />
 
-import { getGroupsForUser } from './groups';
+import { getGroupsForUser, type Group } from './groups';
 
 const mockEq = jest.fn();
 const mockSelect = jest.fn(() => ({ eq: mockEq }));
@@ -16,28 +16,38 @@ describe('getGroupsForUser', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockEq.mockReset();
+
+    // The first filter returns a query that accepts the second filter.
+    mockEq.mockReturnValueOnce({ eq: mockEq });
   });
 
-  it('returns the groups for the requested user', async () => {
-    mockEq.mockResolvedValue({
-      data: [
-        { group: { id: 'group-a', name: 'Gruppe A' } },
-        { group: { id: 'group-b', name: 'Gruppe B' } },
-      ],
+  it('returns groups through active memberships for the requested user', async () => {
+    const expectedGroups: Group[] = [
+      {
+        id: 'group-a',
+        name: 'Gruppe A',
+        admin_membership_id: 'membership-a',
+      },
+      {
+        id: 'group-b',
+        name: 'Gruppe B',
+        admin_membership_id: 'membership-b',
+      },
+    ];
+
+    mockEq.mockResolvedValueOnce({
+      data: expectedGroups.map((group) => ({ group })),
       error: null,
     });
 
-    const groups = await getGroupsForUser('user-1');
+    await expect(getGroupsForUser('user-1')).resolves.toEqual(expectedGroups);
 
-    expect(groups).toEqual([
-      { id: 'group-a', name: 'Gruppe A' },
-      { id: 'group-b', name: 'Gruppe B' },
-    ]);
     expect(mockEq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(mockEq).toHaveBeenCalledWith('is_active', true);
   });
 
-  it('returns an empty list when the user has no groups', async () => {
-    mockEq.mockResolvedValue({
+  it('returns an empty list when the user has no visible active memberships', async () => {
+    mockEq.mockResolvedValueOnce({
       data: [],
       error: null,
     });
@@ -48,7 +58,7 @@ describe('getGroupsForUser', () => {
   it('throws the database error when the request fails', async () => {
     const error = new Error('Database unavailable');
 
-    mockEq.mockResolvedValue({
+    mockEq.mockResolvedValueOnce({
       data: null,
       error,
     });

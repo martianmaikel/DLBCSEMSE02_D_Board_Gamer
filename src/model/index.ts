@@ -1,8 +1,39 @@
-// Model: Datenmodell, Persistenz, Datenzugriff. Owner: Mohammad (@Msaf777).
-// Öffentliche API für den Controller. Kennt weder @controller noch @view.
-export { getGroupsForUser } from './groups';
-export type { Group } from './groups';
-export { getSessionsForGroup } from './sessions';
-export type { SessionWithLocation } from './sessions';
+// Public Model API for the Controller.
 export { signIn } from './auth';
 export type { AuthUser } from './auth';
+
+export { createGroup, getGroupsForUser } from './groups';
+export type { Group } from './groups';
+
+export {
+  admitGroupMember,
+  getActiveMembersForGroup,
+  getMembersForGroupIncludingInactive,
+  isActiveGroupMember,
+  leaveGroup,
+  saveHostPositions,
+  setHostingWillingness,
+} from './memberships';
+export type {
+  AdmitGroupMemberInput,
+  HostPositionChange,
+  HostingWillingnessInput,
+  LeaveGroupInput,
+  Membership,
+} from './memberships';
+
+export {
+  cancelSession,
+  confirmSession,
+  createSession,
+  designateActualHost,
+  getSessionsForGroup,
+  updateSession,
+} from './sessions';
+export type {
+  CreateSessionInput,
+  Session,
+  SessionLocationInput,
+  SessionWithLocation,
+  UpdateSessionInput,
+} from './sessions';
