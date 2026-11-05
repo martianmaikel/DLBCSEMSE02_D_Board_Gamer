@@ -168,6 +168,7 @@ export function createUs2Fixtures() {
     };
   }
   return {
+    fixtureAdmin,
     anonymousClient,
     groupPrefix,
     setup,
