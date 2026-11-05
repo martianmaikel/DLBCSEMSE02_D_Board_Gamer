@@ -488,4 +488,153 @@ describe('US2 memberships and access with local Supabase', () => {
       }),
     ).rejects.toMatchObject({ code: '42501' });
   });
+  it('limits admission and reactivation to the group administrator', async () => {
+    const { group, otherMembershipId } = await createHostingGroup();
+    const members = await getActiveMembersForGroup(group.id);
+    const leavingMember = members.find((membership) => membership.id === otherMembershipId);
+
+    if (!leavingMember) {
+      throw new Error('Admission fixture has no departing membership');
+    }
+
+    await signIn(otherMember.email, otherMember.password);
+
+    const departed = await leaveGroup({
+      groupId: group.id,
+      expectedJoinedAt: leavingMember.joined_at,
+      expectedAdminMembershipId: group.admin_membership_id,
+      successorMembershipId: null,
+    });
+
+    await signIn(member.email, member.password);
+    const membershipsBefore = await getMembersForGroupIncludingInactive(group.id);
+
+    // An ordinary member cannot admit someone or reactivate a former member.
+    await expect(
+      admitGroupMember({
+        groupId: group.id,
+        userId: outsider.id,
+        expectedMembership: null,
+      }),
+    ).rejects.toMatchObject({ code: '42501' });
+
+    await expect(
+      admitGroupMember({
+        groupId: group.id,
+        userId: otherMember.id,
+        expectedMembership: departed,
+      }),
+    ).rejects.toMatchObject({ code: '42501' });
+
+    // Neither a new applicant nor a former member can admit themselves.
+    await signIn(outsider.email, outsider.password);
+
+    await expect(
+      admitGroupMember({
+        groupId: group.id,
+        userId: outsider.id,
+        expectedMembership: null,
+      }),
+    ).rejects.toMatchObject({ code: '42501' });
+
+    await signIn(otherMember.email, otherMember.password);
+
+    await expect(
+      admitGroupMember({
+        groupId: group.id,
+        userId: otherMember.id,
+        expectedMembership: departed,
+      }),
+    ).rejects.toMatchObject({ code: '42501' });
+
+    await signIn(owner.email, owner.password);
+
+    await expect(getMembersForGroupIncludingInactive(group.id)).resolves.toEqual(membershipsBefore);
+
+    const admitted = await admitGroupMember({
+      groupId: group.id,
+      userId: outsider.id,
+      expectedMembership: null,
+    });
+
+    expect(admitted).toMatchObject({
+      group_id: group.id,
+      user_id: outsider.id,
+      is_active: true,
+      willing_to_host: false,
+      host_position: null,
+    });
+
+    const reactivated = await admitGroupMember({
+      groupId: group.id,
+      userId: otherMember.id,
+      expectedMembership: departed,
+    });
+
+    expect(reactivated).toMatchObject({
+      id: otherMembershipId,
+      user_id: otherMember.id,
+      is_active: true,
+      willing_to_host: true,
+      host_position: null,
+    });
+
+    await expect(getActiveMembersForGroup(group.id)).resolves.toHaveLength(4);
+  });
+  it('preserves active memberships on repeated admission and rejects stale snapshots', async () => {
+    const { group, ownerMembershipId, memberMembershipId } = await createHostingGroup();
+    const membersBefore = await getActiveMembersForGroup(group.id);
+    const activeMembership = membersBefore.find(
+      (membership) => membership.id === memberMembershipId,
+    );
+
+    if (!activeMembership) {
+      throw new Error('Repeated-admission fixture has no active membership');
+    }
+
+    const repeated = await admitGroupMember({
+      groupId: group.id,
+      userId: member.id,
+      expectedMembership: activeMembership,
+    });
+
+    expect(repeated).toEqual(activeMembership);
+
+    const staleSnapshots = [
+      null,
+      {
+        id: ownerMembershipId,
+        is_active: activeMembership.is_active,
+        joined_at: activeMembership.joined_at,
+      },
+      {
+        id: activeMembership.id,
+        is_active: false,
+        joined_at: activeMembership.joined_at,
+      },
+      {
+        id: activeMembership.id,
+        is_active: activeMembership.is_active,
+        joined_at: '2000-01-01T00:00:00Z',
+      },
+    ];
+
+    for (const expectedMembership of staleSnapshots) {
+      await expect(
+        admitGroupMember({
+          groupId: group.id,
+          userId: member.id,
+          expectedMembership,
+        }),
+      ).rejects.toMatchObject({ code: 'PT409' });
+    }
+
+    await expect(getActiveMembersForGroup(group.id)).resolves.toEqual(membersBefore);
+
+    const history = await getMembersForGroupIncludingInactive(group.id);
+
+    expect(history.filter((membership) => membership.user_id === member.id)).toEqual([
+      activeMembership,
+    ]);
+  });
 });
