@@ -75,3 +75,40 @@ Format: Datum, Entscheidung, Begründung, Alternativen, wer.
   Abfragefilter allein ersetzen keine Berechtigungsprüfung.
 - **Alternative:** RLS bis nach weiteren User Stories verschieben.
 - **Wer:** Mohammad (Model).
+
+### E-009 · 2026-11-05 · Überschneidungen warnen statt verbieten (E1)
+
+- **Entscheidung:** Eine Person darf beliebig viele Termine in beliebig vielen Gruppen haben,
+  auch am selben Tag oder zur selben Zeit. Der Controller meldet Überschneidungen nur als Warnung:
+  `overlap` bei zeitlicher Überlappung von Terminen verschiedener Gruppen, `same-day` bei gleichem
+  Kalendertag ohne Überlappung. Termine derselben Gruppe werden nicht verglichen.
+- **Begründung:** Spieler:innen entscheiden selbst, welchen Termin sie wahrnehmen. Ein Verbot
+  würde legitime Fälle blockieren, z. B. eine kurze Session vor einer zweiten am Abend.
+  Die reine Zeitüberlappung ist eindeutig und gut testbar.
+- **Alternativen:** Überschneidungen verbieten; zusätzlich Mindestabstand inkl. Anfahrt prüfen
+  (offener Punkt im Konzept, verworfen, weil Anfahrtszeiten unbekannt sind).
+- **Wer:** Maikel (Controller).
+
+### E-010 · 2026-11-05 · Gruppenleitung und Beitritt per Einladungscode
+
+- **Entscheidung:** Jede Gruppe hat eine Gruppenleitung, anfangs die Person, die sie anlegt.
+  Tritt sie aus, übernimmt das am längsten zugehörige Mitglied. Die Leitung benennt die Gruppe um,
+  entfernt Mitglieder, legt Termine an, ändert und sagt sie ab und ändert die
+  Gastgeberreihenfolge. Beitritt per Einladungscode, den Mitglieder teilen (z. B. per WhatsApp):
+  ein Code je Gruppe, gültig 7 Tage, beliebig viele Beitritte. Entfernte Personen können erst
+  nach Freigabe durch die Leitung wieder beitreten.
+- **Begründung:** Klare Zuständigkeit für Änderungen, die alle betreffen. Ein Code lässt sich
+  ohne eigene Freundesliste oder Suche über vorhandene Messenger teilen.
+- **Alternativen:** Alle Mitglieder gleichberechtigt; Einladung per E-Mail; Einmal-Codes.
+- **Wer:** Maikel (Controller), Datenmodell durch Mohammad abzustimmen.
+
+### E-011 · 2026-11-05 · Erinnerungen in der App statt Push, Lieferdienst als Stub
+
+- **Entscheidung:** Push-Benachrichtigungen werden vorerst nicht umgesetzt. Erinnerungen
+  (Abstimmung, Essenswahl, Bestellung, Bewertung) erscheinen als Hinweise auf der Startseite,
+  Verspätungen am Termin. Die optionalen Stories 7 bis 9 werden umgesetzt, Lieferdienste und
+  Menüs sind feste Beispieldaten ohne echte Bestellung oder Bezahlung.
+- **Begründung:** Push braucht zusätzliche Einrichtung und Tests auf Geräten. Die Stories bleiben
+  so ohne externe Abhängigkeiten testbar.
+- **Alternativen:** Push über `expo-notifications`; echte Lieferdienst-API.
+- **Wer:** Maikel (Controller).
