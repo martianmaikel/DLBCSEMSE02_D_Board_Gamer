@@ -1,7 +1,6 @@
-import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { NavigationContainer} from '@react-navigation/native'; 
 
@@ -9,10 +8,85 @@ import { createNativeStackNavigator, NativeStackScreenProps } from '@react-navig
 
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'; 
 
-import  Ionicons from '@expo/vector-icons/Ionicons';  
+import  Ionicons from '@expo/vector-icons/Ionicons'; 
+
+import HomeScreenView from './screens/HomeScreen';
+import OverviewScreenView from './screens/OverviewScreen';
+import GroupsScreenView from './screens/GroupsScreen';
+import VotingScreenView from './screens/VotingScreen';
+import StatisticsScreenView from './screens/StatisticsScreen';
+import ProfileScreenView from './screens/ProfileScreen';
+
 
 import { useFonts } from 'expo-font';
 import { Cinzel_700Bold } from '@expo-google-fonts/cinzel';
+
+import * as Notifications from 'expo-notifications';
+
+// Benachrichtigungen
+Notifications.setNotificationHandler({
+  handleNotification: async() => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+async function requestNotificationPermission() {
+  const { status: existingStatus } =
+    await Notifications.getPermissionsAsync();
+  
+  let finalStatus = existingStatus;
+
+  if (existingStatus !== 'granted') {
+    const { status } =
+      await Notifications.requestPermissionsAsync();
+    
+    finalStatus = status;
+  }
+
+  if (finalStatus !== 'granted') {
+    console.log( 'Keine Berechtigung für  Benachrichtigungen.'
+    );
+    return false;
+  }
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync( 'default',
+      {
+        name: 'Standard',
+        importance: 
+          Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        sound: 'default',
+        lightColor: '#3D579E',
+      }
+    );
+  }
+
+  return true;
+}
+async function sendTestNotification() {
+  const permissionGranted = 
+    await requestNotificationPermission();
+
+  if (!permissionGranted) {
+    return;
+  }
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'TERMINPLANER',
+      subtitle: 'Session morgen um 19:00 bei Maria',
+      body: 'Die Glutwacht · Hauptbahnhof Str.41, Hamburg. Bis 23:00.',
+      sound: 'default',
+    },
+    trigger: null,
+  });
+}
+
+
 
 // Typen
 type User = {
@@ -40,45 +114,7 @@ type TabParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
-// Startseite
-type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Startseite'>; 
-
-function HomeScreen({ navigation }: HomeScreenProps) {
-  return (
-    <View style={styles.container}>
-      <Image
-        source={require('./D&D.jpg')}
-        style={styles.backgroundImage}
-        resizeMode="stretch"
-      />
-
-      <View style={styles.content}>
-        <Text style={styles.title}>Willkommen bei Board Game Terminplaner</Text>  
-
-        <View style={styles.homeButtons}>
-          <Pressable
-            style={styles.button}
-            onPress={() => navigation.navigate('Anmelden')}
-          >
-            <Text style={styles.buttonText}>Anmelden</Text>
-          </Pressable>
-        
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => navigation.navigate('Registrieren')}
-          >
-            <Text style={styles.secondaryButtonText}>Registrieren
-            </Text>
-          </Pressable>
-         </View>
-      </View>
-  
-      <StatusBar style="auto" />
-    </View> 
-  );
-}
-
-//Anmelden-Screen
+// Anmelden-Screen
 type LoginScreenProps = NativeStackScreenProps<RootStackParamList, 'Anmelden'
 > & { users: User[];
 };
@@ -314,80 +350,11 @@ function RegisterScreen({ navigation, users, setUsers, }: RegisterScreenProps) {
             <Text style={styles.switchLink}> Jetzt anmelden</Text>
           </Pressable>
         </View>
-
-        <StatusBar style="auto" />
-      </ScrollView>
-    );
-  }
-
-//Tab-Seiten
-function OverviewScreen() {
-  return (
-    <View style={styles.overviewContainer}>
-      {/* Überschrift */}
-      <Text style={styles.overviewTitle}>
-        Nächste Sessions
-      </Text>
-
-      {/* Bereich, wenn noch keine Gruppe vorhanden ist */}
-      <View style={styles.emptyState}>
-        <Ionicons name="map-outline" size={125} color='#D8CBB2'
-        />
-        <Text style={styles.emptyTitle}>
-          Noch keine Gruppe </Text>
-        <Text style={styles.emptyDescription}>
-          Sobald du in einer Gruppe bist, siehst du hier alle kommende Termine.</Text>
-      </View>
-
-      {/* Gruppen-Buttons */}
-      <View style={styles.groupButtons}>
-        <Pressable
-          style={styles.createGroupButton}
-          onPress={() => console.log('Gruppe erstellen')}
-        >
-          <Text style={styles.plus}>+</Text>
-          <Text style={styles.createGroupText}>
-            Gruppe erstellen </Text>
-        </Pressable>
-        <Pressable
-          style={styles.joinGroupButton}
-          onPress={() => console.log ('Einladungscode eingeben')}
-        >
-          <Text style={styles.joinGroupText}>
-            Mit Einladungscode beitreten.
-          </Text>
-        </Pressable>
-      </View>
-    </View>
+    </ScrollView>
   );
 }
 
-function GroupsScreen() {
-  return <PlaceholderScreen title="Gruppen" />;
-}
-
-function AbstimmungScreen() {
-  return <PlaceholderScreen title="Abstimmung" />;
-}
-
-function StatisticsScreen() {
-  return <PlaceholderScreen title="Statistik" />;
-}
-
-function ProfileScreen() {
-  return <PlaceholderScreen title="Profil" />;
-} 
-
-function PlaceholderScreen({ title }: { title: string }) {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderTitle}>{title}</Text>
-      <Text style={styles.placeholderSubText}>Diese Seite ist noch nicht implementiert.</Text> {/* Später implementieren */}
-    </View>
-  );
-} 
-
-//Tab-Navigation mit fünf Buttons unten
+// Tab-Navigation mit fünf Buttons unten
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -414,7 +381,7 @@ function MainTabs() {
     >
       <Tab.Screen
         name="Übersicht"
-        component={OverviewScreen}
+        component={OverviewScreenView}
         options={{
           tabBarIcon: ({ color, size })  => (
           <Ionicons
@@ -428,7 +395,7 @@ function MainTabs() {
         
       <Tab.Screen
         name="Gruppen"
-        component={GroupsScreen}
+        component={GroupsScreenView}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons 
@@ -442,7 +409,7 @@ function MainTabs() {
 
       <Tab.Screen
         name="Abstimmung"
-        component={AbstimmungScreen}
+        component={VotingScreenView}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons
@@ -456,7 +423,7 @@ function MainTabs() {
 
       <Tab.Screen
         name="Statistik"
-        component={StatisticsScreen}
+        component={StatisticsScreenView}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons
@@ -470,7 +437,7 @@ function MainTabs() {
 
       <Tab.Screen
         name="Profil"
-        component={ProfileScreen}
+        component={ProfileScreenView}
             options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons
@@ -485,7 +452,7 @@ function MainTabs() {
   );
 }
 
-//App-Komponente
+// App-Komponente
 export default function App() {
   const [fontsLoaded] = useFonts({
     Cinzel_700Bold,
@@ -502,7 +469,7 @@ export default function App() {
       <Stack.Navigator>
         <Stack.Screen 
           name="Startseite" 
-          component={HomeScreen} 
+          component={HomeScreenView} 
           options={{ headerShown: false }} />
 
         <Stack.Screen 
@@ -541,82 +508,8 @@ export default function App() {
   );
 }
 
-//Styles
+// Styles
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#940606',
-  },
-
-  backgroundImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,  
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-  },
-
-  content: {
-    flex: 1,
-    justifyContent:'space-between',
-    paddingTop: 80,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    zIndex: 2,
-    elevation: 2,
-  },
-
-  homeButtons: {
-    alignItems: 'center',
-  },
-
-  title: {
-    fontFamily: 'Cinzel_700Bold',
-    fontSize: 34,
-    textAlign: 'center',
-    color: '#FFFFFF',
-    textShadowColor: '#65000C',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
-  },
-
-  button: {
-    width: 220,
-    marginTop: 32,
-    paddingVertical: 15,
-    borderRadius: 12,
-    borderWidth: 2, 
-    borderColor: '#FFFFFF',
-    backgroundColor: '#65000C',
-    alignItems: 'center', 
-  },
-
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-
-  secondaryButton: {
-    width: 220,
-    marginTop: 14,
-    paddingVertical: 15,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#D4AF37',
-    backgroundColor: '#FFFDF8',
-    alignItems: 'center', 
-  },
-
-  secondaryButtonText: {
-    color: '#65000C',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-
   formContainer: {
     flexGrow: 1,
     padding: 24,
@@ -629,7 +522,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontFamily: 'Cinzel_700Bold',
     fontSize: 34,
-    fontWeight: '800',
     color: '#D4AF37',
   },
 
@@ -671,7 +563,7 @@ const styles = StyleSheet.create({
 
   forgotPassword: {
     marginTop: 22,
-    color: '#ee0d0dff',
+    color: '#0000FF',
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
@@ -701,96 +593,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-
-  placeholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#F4F0E7',
-  },
-
-  placeholderTitle: {
-    marginBottom: 12,
-    fontFamily: 'Cinzel_700Bold',
-    fontSize: 30,
-    color: '#211F1A',
-  },
-
-  placeholderSubText: {
-    fontSize: 16,
-    color: '#5D584F',
-    textAlign: 'center',
-  },
-
-  //Style für Gruppe
-  overviewContainer: {
-    flex: 1,
-    backgroundColor: '#F4F0E7',
-    paddingHorizontal: 24,
-    paddingTop: 30,
-    paddingBottom: 24,
-  },
-  overviewTitle: {
-    fontFamily: 'Cinzel_700Bold',
-    fontSize: 30,
-    color: '#211F1A',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  emptyTitle: {
-    marginTop: 25,
-    fontFamily: 'Cinzel_700Bold',
-    fontSize: 27,
-    color: '#211F1A',
-    textAlign: 'center',
-  },
-  emptyDescription: {
-    marginTop: 18,
-    fontSize: 18,
-    lineHeight: 27,
-    color: '#5D584F',
-    textAlign: 'center',
-  },
-  groupButtons: {
-    width: '100%',
-    gap: 16,
-  },
-  createGroupButton: {
-    height: 92,
-    backgroundColor: '#31549A',
-    borderRadius: 24,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  plus: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    marginRight: 12,
-  },
-  createGroupText: {
-    color: '#FFFFFF',
-    fontSize: 23,
-    fontWeight: 'bold',
-  },
-  joinGroupButton: {
-    height: 92,
-    backgroundColor: '#FFFCF6',
-    borderWidth: 2,
-    borderColor: '#DCCFB8',
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  joinGroupText: {
-    color: '#211F1A',
-    fontSize: 21,
-    fontWeight: 'bold',
-  },
-
+  
 });

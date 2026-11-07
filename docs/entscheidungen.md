@@ -36,3 +36,42 @@ Format: Datum, Entscheidung, Begründung, Alternativen, wer.
   Lösungen sollen wegen Plagiatsprüfung nicht geteilt werden. Das Repo ist öffentlich, damit der
   Tutor Einblick in den Code hat.
 - **Wer:** Maikel
+
+### E-005 · 2026-10-27 · Supabase als Backend-as-a-Service
+
+- **Begründung**: PostgreSQL passt zu den Beziehungen zwischen Accounts, Gruppen, Terminen,
+  Abstimmungen und Bewertungen. Integrierte Authentifizierung und automatisch bereitgestellte
+  APIs reduzieren den Backend-Aufwand. Das Team nutzt Supabase Cloud ohne lokale
+  Backend-Einrichtung; Mohammad plant zusätzlich eine separate lokale Supabase-Umgebung
+  über Docker für Entwicklung und Tests.
+- **Alternativen:** Firebase, eigener REST-Server mit Express und Prisma.
+
+- **Wer:** Mohammad nach Abstimmung mit dem Team
+
+### E-006 · 2026-10-30 · Manuelles Deployment der Datenbankmigrationen
+
+- **Entscheidung:** Mohammad übernimmt das Deployment auf Supabase Cloud.
+  Übertragen werden lokal getestete Migrationen aus `main`, nachdem der zugehörige Pull Request geprüft, freigegeben und gemergt wurde.
+- **Begründung:** Die Zuständigkeit entspricht der Model-Verantwortung.
+  Der Ablauf hält Review und Deployment nachvollziehbar und benötigt in der aktuellen Projektphase keine zusätzliche GitHub-Integration.
+- **Alternativen:** Automatisches Deployment aus `main` über die Supabase-GitHub-Integration oder GitHub Actions. Bei wachsendem Bedarf erneut bewerten.
+- **Wer:** Mohammad.
+
+### E-007 · 2026-11-02 · Begrenzter Schemaumfang für User Story 1
+
+- **Entscheidung:** Zunächst werden nur Gruppen, Mitgliedschaften, Orte und Sessions mit den für User Story 1 benötigten Feldern umgesetzt.
+  Für die Benutzeridentität genügt vorerst `auth.users`.
+- **Begründung:** Ein kleiner Umsetzungsschritt erleichtert Entwicklung und Review.
+  `profiles` und weitere Attribute des Gesamtentwurfs bleiben zurückgestellt und werden bei fachlichem Bedarf durch spätere Migrationen ergänzt.
+- **Wer:** Mohammad (Model).
+
+### E-008 · 2026-11-03 · Geschützte Lesezugriffe für User Story 1
+
+- **Entscheidung:** RLS wird vor der Cloud-Freigabe umgesetzt. Angemeldete
+  Mitglieder lesen ihre eigenen Mitgliedschaften sowie die zugehörigen Gruppen,
+  Sessions und Orte. Schreibzugriffe aus der App bleiben gesperrt.
+  Der Model stellt eine einfache Anmeldung für bestehende Accounts bereit.
+- **Begründung:** Die Lesezugriffe benötigen eine verifizierte Benutzeridentität.
+  Abfragefilter allein ersetzen keine Berechtigungsprüfung.
+- **Alternative:** RLS bis nach weiteren User Stories verschieben.
+- **Wer:** Mohammad (Model).

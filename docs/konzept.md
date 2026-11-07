@@ -41,7 +41,6 @@ Optionale Stories nur, wenn Zeit bleibt.
 
 | Thema                     | Frage                                                                                           | Zuständig  |
 | ------------------------- | ----------------------------------------------------------------------------------------------- | ---------- |
-| Backend                   | Geteilte Datenhaltung nötig. BaaS (Firebase, Supabase) oder eigener REST-Server?                | Model      |
 | Navigation                | Expo Router (empfohlen) oder React Navigation?                                                  | View       |
 | Spielleiter vs. Gastgeber | Bei D&D leitet meist dauerhaft dieselbe Person (DM), der Gastgeber rotiert. Eigenes Rollenfeld? | Team       |
 | Kampagne vs. One-Shot     | Abstimmung über Inhalte ist bei laufender Kampagne schwach. Gruppentyp mit/ohne Abstimmung?     | Team       |
