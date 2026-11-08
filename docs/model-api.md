@@ -243,6 +243,19 @@ ist für alte Sessions zulässig. Eine zwischenzeitliche Änderung nur der Dauer
 führt ebenfalls zu `PT409`. Danach neu laden, statt mit dem alten Snapshot
 fortzufahren.
 
+### Persönliche Session-Absage
+
+`optOutOfSession(sessionId)` speichert die eigene Absage zu einer geplanten
+Session (`scheduled`) und liefert `Promise<void>`. Wiederholte Aufrufe
+erzeugen keinen weiteren Datensatz. Session-Status, Hostzuordnung und
+Hosting-Reihenfolge bleiben erhalten.
+
+`getSessionParticipants(sessionId)` liefert `Membership[]` mit den aktuell
+aktiven Mitgliedern der Session-Gruppe ohne persönliche Absage. Beide
+Aufrufe erfordern eine aktive Mitgliedschaft in dieser Gruppe. Die
+Teilnehmerliste ist eine Planungssicht und wird unabhängig vom Session-Status
+aus den aktuellen Mitgliedschaften ermittelt.
+
 ## Atomare Speicherung und Controller-Verantwortung
 
 Gruppenerstellung, Positionsänderungen und Session-Bestätigung werden jeweils

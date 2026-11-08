@@ -19,6 +19,8 @@ erDiagram
     memberships |o..o| groups : verwaltet
     memberships |o..o{ sessions : "geplanter Host"
     memberships |o..o{ sessions : "tatsaechlicher Host"
+    sessions ||..o{ session_opt_outs : hat
+    memberships ||..o{ session_opt_outs : meldet
 
     "auth.users" {
         uuid id PK
@@ -60,6 +62,12 @@ erDiagram
         uuid planned_host_membership_id FK "Legacy nullable"
         uuid actual_host_membership_id FK "nullable"
         session_status status
+    }
+
+    session_opt_outs {
+        uuid session_id PK,FK
+        uuid membership_id PK,FK
+        uuid group_id FK
     }
 ```
 
@@ -146,6 +154,13 @@ Hostauswahl, Rotationsfortschritt, Buchungs- und Stornierungsverarbeitung,
 Tauschlogik und Nachfolgeauswahl gehören zum Controller. Die Datenbank prüft
 Berechtigungen und Integrität und speichert zusammengehörige Änderungen atomar.
 
+## Persönliche Session-Absagen
+
+`session_opt_outs` speichert pro Session und Mitgliedschaft höchstens eine
+persönliche Absage. Zusammengesetzte Fremdschlüssel stellen sicher, dass
+Session und Mitgliedschaft derselben Gruppe angehören. Beim Löschen einer
+Session werden ihre Absagen mitgelöscht.
+
 ## Integrität und Übergangsdaten
 
 - `UNIQUE (group_id, user_id)` verhindert doppelte Mitgliedschaften.
@@ -154,14 +169,14 @@ Berechtigungen und Integrität und speichert zusammengehörige Änderungen atoma
   Grundlage sind eindeutige Kombinationen aus `group_id` und `id`
   in `memberships` beziehungsweise `locations`.
 
-| Feld                                  | Bedeutung von `NULL`                                                          |
-| ------------------------------------- | ----------------------------------------------------------------------------- |
-| `groups.admin_membership_id`          | Bestehende Testgruppe ohne initialisierte Administration.                     |
-| `memberships.host_position`           | Keine zugewiesene Hosting-Position.                                           |
-| `memberships.joined_at`               | Bestehende Legacy-Testdaten ohne bekannten Beginn.                            |
-| `sessions.planned_host_membership_id` | Bestehende Legacy-Testdaten ohne geplanten Host.                              |
-| `sessions.actual_host_membership_id`  | Noch kein tatsächlicher Host festgelegt. Bei `completed` ist er erforderlich. |
-| `sessions.duration_minutes`           | Unbekannte Dauer einer alten Session.                                         |
+| Feld | Bedeutung von `NULL` |
+| --- | --- |
+| `groups.admin_membership_id` | Bestehende Testgruppe ohne initialisierte Administration. |
+| `memberships.host_position` | Keine zugewiesene Hosting-Position. |
+| `memberships.joined_at` | Bestehende Legacy-Testdaten ohne bekannten Beginn. |
+| `sessions.planned_host_membership_id` | Bestehende Legacy-Testdaten ohne geplanten Host. |
+| `sessions.actual_host_membership_id` | Noch kein tatsächlicher Host festgelegt. Bei `completed` ist er erforderlich. |
+| `sessions.duration_minutes` | Unbekannte Dauer einer alten Session. |
 
 `CHECK ... NOT VALID` erlaubt bestehende Legacy-Zeilen ohne `joined_at`
 beziehungsweise geplanten Host. Neue und aktualisierte Zeilen müssen die

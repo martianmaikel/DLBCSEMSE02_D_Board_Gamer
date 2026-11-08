@@ -139,3 +139,8 @@ Format: Datum, Entscheidung, Begründung, Alternativen, wer.
 - **Wer:** Team.
 
 Details: [Datenmodell](datenmodell.md) und [Model-API](model-api.md).
+
+### E-015 · 2026-11-08 · Standardteilnahme und persönliche Absage
+
+- **Entscheidung:** Aktive Gruppenmitglieder gelten bei geplanten Sessions standardmäßig als Teilnehmende. Jedes Mitglied kann die eigene Teilnahme an einer einzelnen Session absagen.
+- **Wer:** Team.

@@ -1,5 +1,5 @@
 import type { Database, Json } from './database.types';
-import { type HostPositionChange, toHostPositionChangesJson } from './memberships';
+import { type HostPositionChange, type Membership, toHostPositionChangesJson } from './memberships';
 import { supabase } from './supabase';
 
 export type Session = Database['public']['Tables']['sessions']['Row'];
@@ -8,6 +8,32 @@ type Location = Database['public']['Tables']['locations']['Row'];
 export type SessionWithLocation = Session & {
   location: Location;
 };
+
+export async function optOutOfSession(sessionId: string): Promise<void> {
+  const { error } = await supabase.rpc('opt_out_of_session', {
+    target_session_id: sessionId,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function getSessionParticipants(sessionId: string): Promise<Membership[]> {
+  const { data, error } = await supabase.rpc('get_session_participants', {
+    target_session_id: sessionId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (data === null) {
+    throw new Error('Session participants returned no data');
+  }
+
+  return data;
+}
 
 export async function getSessionsForGroup(groupId: string): Promise<SessionWithLocation[]> {
   const { data, error } = await supabase

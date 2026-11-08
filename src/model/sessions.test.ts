@@ -5,7 +5,9 @@ import {
   confirmSession,
   createSession,
   designateActualHost,
+  getSessionParticipants,
   getSessionsForGroup,
+  optOutOfSession,
   type Session,
   updateSession,
 } from './sessions';
@@ -78,6 +80,51 @@ describe('getSessionsForGroup', () => {
     });
 
     await expect(getSessionsForGroup('group-1')).rejects.toBe(error);
+  });
+});
+
+describe('personal session participation', () => {
+  beforeEach(() => {
+    mockRpc.mockReset();
+  });
+
+  it('opts out using only the session ID, leaving identity resolution to the server', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null });
+
+    await expect(optOutOfSession('session-1')).resolves.toBeUndefined();
+    expect(mockRpc).toHaveBeenCalledWith('opt_out_of_session', {
+      target_session_id: 'session-1',
+    });
+  });
+
+  it.each([{ participants: [] }, { participants: [{ id: 'member-1', is_active: true }] }])(
+    'returns the server-computed participant list $participants',
+    async ({ participants }) => {
+      mockRpc.mockResolvedValue({ data: participants, error: null });
+
+      await expect(getSessionParticipants('session-1')).resolves.toEqual(participants);
+      expect(mockRpc).toHaveBeenCalledWith('get_session_participants', {
+        target_session_id: 'session-1',
+      });
+    },
+  );
+
+  it.each([optOutOfSession, getSessionParticipants])(
+    'propagates database errors',
+    async (operation) => {
+      const error = { code: '42501', message: 'Active group membership required' };
+      mockRpc.mockResolvedValue({ data: null, error });
+
+      await expect(operation('session-1')).rejects.toBe(error);
+    },
+  );
+
+  it('rejects a missing participant result rather than treating it as an empty list', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null });
+
+    await expect(getSessionParticipants('session-1')).rejects.toThrow(
+      'Session participants returned no data',
+    );
   });
 });
 

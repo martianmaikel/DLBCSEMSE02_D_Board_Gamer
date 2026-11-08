@@ -112,6 +112,40 @@ export type Database = {
         };
         Relationships: [];
       };
+      session_opt_outs: {
+        Row: {
+          group_id: string;
+          membership_id: string;
+          session_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          group_id: string;
+          membership_id: string;
+          session_id: string;
+        };
+        Update: {
+          group_id?: string;
+          membership_id?: string;
+          session_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'session_opt_outs_membership_same_group_fk';
+            columns: ['group_id', 'membership_id'];
+            isOneToOne: false;
+            referencedRelation: 'memberships';
+            referencedColumns: ['group_id', 'id'];
+          },
+          {
+            foreignKeyName: 'session_opt_outs_session_same_group_fk';
+            columns: ['group_id', 'session_id'];
+            isOneToOne: false;
+            referencedRelation: 'sessions';
+            referencedColumns: ['group_id', 'id'];
+          },
+        ];
+      };
       sessions: {
         Row: {
           actual_host_membership_id: string | null;
@@ -309,6 +343,24 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      get_session_participants: {
+        Args: { target_session_id: string };
+        Returns: {
+          group_id: string;
+          host_position: number | null;
+          id: string;
+          is_active: boolean;
+          joined_at: string | null;
+          user_id: string;
+          willing_to_host: boolean;
+        }[];
+        SetofOptions: {
+          from: '*';
+          to: 'memberships';
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       leave_group: {
         Args: {
           expected_admin_id: string;
@@ -321,6 +373,7 @@ export type Database = {
           membership: Database['public']['Tables']['memberships']['Row'];
         }[];
       };
+      opt_out_of_session: { Args: { target_session_id: string }; Returns: undefined };
       save_host_positions: {
         Args: { position_changes: Json; target_group_id: string };
         Returns: {

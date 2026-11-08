@@ -31,7 +31,9 @@ export {
   confirmSession,
   createSession,
   designateActualHost,
+  getSessionParticipants,
   getSessionsForGroup,
+  optOutOfSession,
   updateSession,
 } from './sessions';
 export type {
