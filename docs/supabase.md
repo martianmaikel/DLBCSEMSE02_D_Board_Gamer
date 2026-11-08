@@ -123,14 +123,6 @@ Die bereits gemeinsam genutzten Migrationen aus `main` bleiben unverändert.
 `20261104220141_fix_hosting_conflict_errors.sql` erwartet weiterhin die
 ursprünglichen `40001`-Definitionen und ersetzt sie beim Aufbau durch `PT409`.
 
-Auch die rein lokale Profil-Migration `20261108085659_add_user_profiles.sql`
-enthält den Registrierungstrigger direkt. Nach dieser Ergänzung muss die lokale
-Testdatenbank mit `db reset --local` aus dem aktuellen Checkout neu aufgebaut
-werden; ein erneutes `migration up` führt die bereits angewendete Datei nicht aus.
-Die vorhandene Auth-Konfiguration bleibt unverändert: Lokal ist
-`auth.email.enable_confirmations = false`. Bei aktivierter Bestätigung liefert
-`signUp` einen Nutzer ohne Sitzung und `requiresEmailConfirmation: true`.
-
 ## Cloud aktualisieren · Model
 
 Einmalig mit Zugriff auf das gemeinsame Supabase-Projekt anmelden und diese Projektkopie verknüpfen:
@@ -217,52 +209,38 @@ benötigen keine lokale Supabase-Instanz.
 
 ## Lokales Prüfprotokoll · 08.11.2026
 
-Geprüft auf `model/host-rotation` mit der Projekt-CLI `2.122.0` gegen den
-Docker-Container `supabase_db_DLBCSEMSE02_D_Board_Gamer`.
-Lokales Ziel: Datenbank `postgres`, API `http://127.0.0.1:54321`,
-Datenbankport `54322`. Keine Cloud-Änderung und kein Deployment.
+Geprüft auf `model/host-rotation` mit der Projekt-CLI `2.122.0` und lokalem
+Supabase in Docker. Die folgenden Ergebnisse beziehen sich jeweils auf den
+Stand der genannten Änderung.
 
-| Prüfung                                                                     | Ergebnis                                                                                                                                                                    |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run supabase -- db reset --local`                                      | Erfolgreich; alle 18 Migrationen einschließlich der Konfliktkorrektur angewendet, ohne zusätzliche Duration-Migration.                                                      |
-| `npm run --silent supabase -- gen types typescript --local --schema public` | Erfolgreich; erst in eine temporäre Datei geschrieben, danach `src/model/database.types.ts` ersetzt und mit Prettier formatiert.                                            |
-| Lokales Schema per SQL geprüft                                              | `duration_minutes`: nullable `integer`, kein Standardwert; je eine neue öffentliche/private Create- und Update-Signatur; Session-Guard enthält `PT409`, nicht mehr `40001`. |
-| `npm run check`                                                             | Erfolgreich: ESLint, TypeScript und 3 Unit-Testsuites mit 12 Tests.                                                                                                         |
-| `npm run test:integration`                                                  | Erfolgreich: 6 Testsuites mit 46 Tests einschließlich Dauer, Altdaten, Rollback und Konflikten.                                                                             |
-| `git --no-pager diff --check`                                               | Erfolgreich; keine Whitespace-Fehler.                                                                                                                                       |
+### Session-Dauer
 
-Die gemeinsamen Entscheidungen und das bisherige Austrittsverhalten wurden
-für diesen Abschluss nicht geändert. Controller- und View-Verhalten sind nicht
-Gegenstand dieser lokalen Prüfung.
+| Prüfung                                | Ergebnis                                                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run supabase -- db reset --local` | 18 Migrationen einschließlich der Konfliktkorrektur erfolgreich angewendet.                                                           |
+| Generierte Datenbanktypen              | Lokal aus dem Schema `public` erzeugt und formatiert.                                                                                 |
+| Schemaprüfung                          | `duration_minutes` ist ein nullable `integer` ohne Standardwert. Erstellen, Bearbeiten und Konfliktprüfung berücksichtigen die Dauer. |
+| `npm run check`                        | ESLint, TypeScript und 12 Unit-Tests erfolgreich.                                                                                     |
+| `npm run test:integration`             | 46 Tests erfolgreich, einschließlich Dauer, Altdaten, Rollback und Konflikten.                                                        |
 
-### Ergänzung: Registrierung und Profile
+### Registrierung und Profile
 
-Die rein lokale Profil-Migration enthält nun den Trigger auf `auth.users`.
-Alle Fixtures für neue Auth-Konten liefern Benutzernamen als Metadaten.
-Die Profiltests simulieren Altkonten durch gezieltes Entfernen ihrer Fixture-Profile
-mit dem lokalen Service-Role-Client; der Registrierungstrigger bleibt aktiv.
-Die Unit-Tests prüfen beide Rückgabevarianten der Registrierung, auch die
-ausstehende E-Mail-Bestätigung. Integrationstests verwenden die unveränderte
-lokale Auth-Konfiguration ohne Bestätigungspflicht.
+Die Profil-Migration enthält den Trigger zur automatischen Profilanlage.
+Testkonten übergeben Benutzernamen als Metadaten. Die Unit-Tests prüfen
+auch die Registrierung mit ausstehender E-Mail-Bestätigung.
 
-Der erste Integrationslauf bestand 58 von 64 Tests. Sechs neue Fehlerprüfungen
-erwarteten fälschlich `error.code = unexpected_failure`. Der lokale Auth-Dienst
-liefert diesen Wert zwar im HTTP-Body, das installierte SDK wirft bei HTTP 500
-aber einen `AuthRetryableFetchError` ohne `code`. Nach Abgleich mit HTTP-Antwort
-und SDK-Quellcode wurden die Erwartungen auf Fehlertyp, Status und Meldung
-korrigiert. Der anschließende gezielte Lauf bestand alle sieben Registrierungstests.
+| Prüfung                                | Ergebnis                                                                                                              |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `npm run supabase -- db reset --local` | 19 Migrationen einschließlich des Registrierungstriggers erfolgreich angewendet.                                      |
+| Generierte Datenbanktypen              | Identisch zu `src/model/database.types.ts`.                                                                           |
+| `npm run check`                        | ESLint, TypeScript und 16 Unit-Tests erfolgreich.                                                                     |
+| `npm run test:integration`             | 64 Tests erfolgreich, einschließlich Profilanlage, Namensprüfung, Rollback und Anmeldung eines Altkontos ohne Profil. |
 
-Prüfung am Profil-Commit `a3af3f1` während des interaktiven Rebase:
+### Abfrageoptimierung
 
-| Prüfung                                                                | Ergebnis                                                                                                                                                                                                                   |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run supabase -- db reset --local`                                 | Erfolgreich; alle 19 Migrationen aus dem aktuellen Checkout angewendet, einschließlich Profil- und Registrierungstrigger.                                                                                                  |
-| Datenbanktypen lokal neu generiert und mit Projekt-Prettier formatiert | Identisch zu `src/model/database.types.ts`; keine Änderung erforderlich.                                                                                                                                                   |
-| Lokales Schema per SQL geprüft                                         | Trigger auf `auth.users`, private `SECURITY DEFINER`-Funktion mit leerem `search_path`; nur `postgres` hat Ausführungsrechte. Profil-Lesepolicy unverändert.                                                               |
-| `npm run check`                                                        | Erfolgreich: ESLint, TypeScript, 3 Unit-Testsuites mit 16 Tests.                                                                                                                                                           |
-| `npm run test:integration`                                             | Abschließender Gesamtlauf erfolgreich: 8 Testsuites mit 64 Tests; Registrierung samt Profil, fehlende/leere und doppelte Namen, Rollback, erneuter Versuch mit derselben E-Mail und Anmeldung eines Altkontos ohne Profil. |
-| `git diff --check`                                                     | Erfolgreich; keine Whitespace-Fehler.                                                                                                                                                                                      |
-
-Nur lokale Supabase-Arbeiten; keine Cloud-Änderung und kein Deployment.
-Git wurde ausschließlich lesend verwendet. Staging, Amend, Stash und
-Fortsetzung des Rebase bleiben beim Menschen.
+Die Migration `20261108091030_optimize_membership_and_session_lookups.sql`
+ergänzt B-Tree-Indizes auf `memberships (user_id)` und
+`sessions (group_id, starts_at)`. Bei der ursprünglichen lokalen Prüfung
+der Index-Migration wurden beide Indexdefinitionen ohne Duplikate
+verifiziert. RLS-Policies und Mitgliedschaftsprüfungen blieben unverändert.
+Der lokale Datenbank-Lint meldete keine Schemafehler.
