@@ -113,4 +113,20 @@ Format: Datum, Entscheidung, Begründung, Alternativen, wer.
 - **Alternative:** Beitrittsanfragen mit Freigabe als eigene User Story.
 - **Wer:** Team bei der ursprünglichen Festlegung der User Stories.
 
+### E-013 · 2026-11-08 · Registrierung und Profile als gemeinsame Grundlage
+
+- **Entscheidung:** `profiles` ergänzt Auth-Accounts um einen bewusst gewählten,
+  nicht leeren Benutzernamen, eindeutig ohne Groß-/Kleinschreibung. Neue
+  Registrierungen verlangen Benutzername, E-Mail und Passwort; das Profil wird
+  automatisch und atomar mit dem Konto angelegt. Bestehende Accounts bleiben
+  ohne Profil nutzbar; keine Ableitung aus E-Mail-Adressen.
+  Schreiben ist auf das eigene Profil beschränkt. Lesen ist für das eigene
+  Profil und aktive Mitglieder gemeinsamer aktiver Gruppen erlaubt.
+- **Einordnung:** Gemeinsame technische Grundlage, keine Anforderung aus US2.
+  Einladungen und Eingabemaske bleiben außerhalb dieses Schritts.
+  Die bisherigen Teamentscheidungen und das Austrittsverhalten bleiben erhalten.
+- **Alternative:** Separate Profilanlage nach der Registrierung; wegen möglicher
+  Konten ohne Profil bei einem Fehler verworfen.
+- **Wer:** Mohammad.
+
 Details: [Datenmodell](datenmodell.md) und [Model-API](model-api.md).

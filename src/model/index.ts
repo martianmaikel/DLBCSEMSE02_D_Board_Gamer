@@ -1,6 +1,9 @@
 // Public Model API for the Controller.
-export { signIn } from './auth';
-export type { AuthUser } from './auth';
+export { signIn, signUp } from './auth';
+export type { AuthUser, SignUpInput, SignUpResult } from './auth';
+
+export { getActiveMemberProfilesForGroup, getOwnProfile, saveOwnProfile } from './profiles';
+export type { Profile } from './profiles';
 
 export { createGroup, getGroupsForUser } from './groups';
 export type { Group } from './groups';

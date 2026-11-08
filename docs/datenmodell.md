@@ -1,8 +1,9 @@
-# Datenmodell – User Story 1 und 2
+# Datenmodell – User Story 1 und 2 und gemeinsame Grundlagen
 
 Stand: 08.11.2026. Die US2-Erweiterungen sind auf dem Feature-Branch lokal
-implementiert und getestet. Die US2-Migrationen wurden in diesem Arbeitsstand
-nur lokal angewendet.
+implementiert und getestet. Profile ergänzen die gemeinsame technische Grundlage;
+sie sind keine Anforderung aus US2. Die US2- und Profil-Migrationen wurden in
+diesem Arbeitsstand nur lokal angewendet.
 
 Maßgeblich sind die [SQL-Migrationen](../supabase/migrations/).
 `auth.users` gehört zu Supabase Auth und wird nicht durch unsere Migrationen
@@ -12,6 +13,7 @@ angelegt.
 
 ```mermaid
 erDiagram
+    "auth.users" ||..o| profiles : hat
     "auth.users" ||..o{ memberships : hat
     groups ||..o{ memberships : hat
     groups ||..o{ locations : hat
@@ -23,6 +25,11 @@ erDiagram
 
     "auth.users" {
         uuid id PK
+    }
+
+    profiles {
+        uuid id PK,FK
+        text username "eindeutig ohne Gross-/Kleinschreibung"
     }
 
     groups {
@@ -65,6 +72,30 @@ Datensätze.
 
 `session_status` enthält `scheduled`, `completed` und `cancelled`.
 Ein vergangener Termin allein ändert den Status nicht.
+
+## Profile und Registrierung
+
+`profiles.id` ist Primärschlüssel und Fremdschlüssel auf `auth.users.id`.
+Pro Konto gibt es höchstens ein Profil. Beim Löschen des Auth-Kontos wird
+sein Profil mitgelöscht. Mitgliedschaften referenzieren `auth.users`.
+
+Die Registrierung verlangt Benutzername, E-Mail und Passwort. Ein Trigger
+auf `auth.users` legt das Profil in derselben Transaktion wie das Konto an.
+Beim Anlegen und Ändern des Profils wird äußerer Leerraum entfernt. Der
+Benutzername muss danach nicht leer sein. Ein eindeutiger Index auf
+`lower(username)` sichert die Eindeutigkeit unabhängig von Groß- und
+Kleinschreibung. Schlägt die Profilanlage fehl, wird die Registrierung
+zurückgerollt.
+
+Bestehende Konten ohne Profil bleiben nutzbar. Ihre Inhaber können ein
+Profil über `save_own_profile` anlegen und später ändern. Die Funktion
+ermittelt die Nutzer-ID aus der angemeldeten Sitzung und erlaubt Änderungen
+ausschließlich am eigenen Profil.
+
+Angemeldete Nutzer dürfen ihr eigenes Profil lesen. Andere Profile sind
+sichtbar, wenn beide Nutzer aktive Mitgliedschaften in mindestens einer
+gemeinsamen Gruppe haben. Direkte Tabellenänderungen aus der App und
+anonyme Zugriffe sind gesperrt.
 
 ## Session-Dauer
 
@@ -156,6 +187,12 @@ die Prüfungen erfüllen. Alte Beitrittszeiten werden nicht erfunden.
 - `getSessionsForGroup(groupId)` liefert Sessions aller Status mit Ort,
   aufsteigend nach `starts_at`. Der Controller bestimmt die nächste Session.
 - `signIn(email, password)` meldet einen bestehenden Account an.
+- `signUp({ username, email, password })` registriert einen Account samt Profil;
+  das Ergebnis unterscheidet sofortige Anmeldung und ausstehende E-Mail-Bestätigung.
+- `getOwnProfile()` liest das eigene Profil oder liefert `null`.
+- `saveOwnProfile(username)` legt das eigene Profil an oder ändert dessen Namen.
+- `getActiveMemberProfilesForGroup(groupId)` liefert vorhandene Profile aktiver
+  Mitglieder einer eigenen aktiven Gruppe, nach Nutzer-ID sortiert.
 
 RLS erlaubt angemeldeten aktuellen Mitgliedern die Lesezugriffe auf ihre
 Gruppe, deren Orte, Sessions und sämtliche Mitgliedschaften dieser Gruppe.

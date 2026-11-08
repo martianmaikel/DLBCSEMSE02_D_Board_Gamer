@@ -96,6 +96,22 @@ export type Database = {
           },
         ];
       };
+      profiles: {
+        Row: {
+          id: string;
+          username: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          id: string;
+          username: string;
+        };
+        Update: {
+          id?: string;
+          username?: string;
+        };
+        Relationships: [];
+      };
       sessions: {
         Row: {
           actual_host_membership_id: string | null;
@@ -280,6 +296,19 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      get_active_member_profiles: {
+        Args: { target_group_id: string };
+        Returns: {
+          id: string;
+          username: string;
+        }[];
+        SetofOptions: {
+          from: '*';
+          to: 'profiles';
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       leave_group: {
         Args: {
           expected_admin_id: string;
@@ -319,6 +348,19 @@ export type Database = {
           to: 'memberships';
           isOneToOne: false;
           isSetofReturn: true;
+        };
+      };
+      save_own_profile: {
+        Args: { profile_username: string };
+        Returns: {
+          id: string;
+          username: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'profiles';
+          isOneToOne: true;
+          isSetofReturn: false;
         };
       };
       set_hosting_willingness: {

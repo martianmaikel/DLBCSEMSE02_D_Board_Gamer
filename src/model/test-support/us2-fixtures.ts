@@ -64,6 +64,7 @@ export function createUs2Fixtures() {
       email,
       password,
       email_confirm: true,
+      user_metadata: { username: `us2-${label}-${runId}` },
     });
 
     if (error) {
@@ -79,11 +80,16 @@ export function createUs2Fixtures() {
     return { id: data.user.id, email, password };
   }
 
-  async function setup() {
+  async function setup({ withoutProfiles = false }: { withoutProfiles?: boolean } = {}) {
     owner = await createAccount('owner');
     member = await createAccount('member');
     otherMember = await createAccount('other');
     outsider = await createAccount('outsider');
+
+    if (withoutProfiles) {
+      // Simulate accounts created before the profile migration, without disabling the trigger.
+      await fixtureAdmin.from('profiles').delete().in('id', createdUserIds).throwOnError();
+    }
 
     return { owner, member, otherMember, outsider };
   }

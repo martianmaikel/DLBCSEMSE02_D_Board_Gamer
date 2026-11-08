@@ -4,7 +4,8 @@ Das Team nutzt Supabase Cloud. Nur Mohammad (Model) entwickelt zusätzlich lokal
 Alle Befehle im Projektordner ausführen.
 
 Das aktuelle Schema steht im [Datenmodell für User Story 1 und 2](datenmodell.md).
-Die US2-Erweiterungen wurden lokal geprüft. Die Übertragung in die gemeinsame
+Die US2-Erweiterungen sowie Registrierung und Profile als gemeinsame Grundlage wurden lokal geprüft.
+Profile sind keine Anforderung aus US2. Die Übertragung in die gemeinsame
 Cloud ist ein separater Schritt nach Review und Merge.
 
 ## App einrichten
@@ -33,7 +34,10 @@ Zustandswerte, atomare Speicherung und Fehlerbehandlung.
 Aktuelle Gruppenmitgliedschaft erfordert `is_active = true`.
 Erhaltene Mitgliedschaftsdatensätze ehemaliger Mitglieder gewähren keinen Zugriff.
 
-Die View bindet Anmeldung und Datenzugriff über den Controller an.
+Die View bindet Registrierung, Anmeldung und Datenzugriff über den Controller an.
+Neue Registrierungen benötigen Benutzername, E-Mail und Passwort. `signUp`
+übermittelt den Namen in den Auth-Metadaten; ein Datenbanktrigger legt das Profil
+atomar mit dem Konto an. Bestehende Konten ohne Profil bleiben nutzbar.
 Der Controller behandelt geworfene Fehler und berechnet die Anwendungslogik
 für Hostauswahl, Rotation, Buchungen, Stornierungen, Tausch und Nachfolge.
 
@@ -119,6 +123,14 @@ Die bereits gemeinsam genutzten Migrationen aus `main` bleiben unverändert.
 `20261104220141_fix_hosting_conflict_errors.sql` erwartet weiterhin die
 ursprünglichen `40001`-Definitionen und ersetzt sie beim Aufbau durch `PT409`.
 
+Auch die rein lokale Profil-Migration `20261108085659_add_user_profiles.sql`
+enthält den Registrierungstrigger direkt. Nach dieser Ergänzung muss die lokale
+Testdatenbank mit `db reset --local` aus dem aktuellen Checkout neu aufgebaut
+werden; ein erneutes `migration up` führt die bereits angewendete Datei nicht aus.
+Die vorhandene Auth-Konfiguration bleibt unverändert: Lokal ist
+`auth.email.enable_confirmations = false`. Bei aktivierter Bestätigung liefert
+`signUp` einen Nutzer ohne Sitzung und `requiresEmailConfirmation: true`.
+
 ## Cloud aktualisieren · Model
 
 Einmalig mit Zugriff auf das gemeinsame Supabase-Projekt anmelden und diese Projektkopie verknüpfen:
@@ -192,6 +204,12 @@ Die Tests erstellen eigene Daten und entfernen sie anschließend. Sie prüfen:
 - Speichern, Lesen und Ändern der Dauer einschließlich 30 und 1440 Minuten,
   ungültige Werte, `NULL`-Altdaten und unvollständige Snapshots.
 - `PT409` bei konkurrierenden Änderungen, auch allein an der Dauer.
+- Registrierung mit automatischem Profil, Ablehnung fehlender, leerer und
+  unabhängig von Groß-/Kleinschreibung belegter Namen sowie atomaren Rollback.
+- Profile, ausdrückliches Anlegen für Altkonten und Umbenennen;
+  bestehende Accounts ohne Profil bleiben für Anmeldung und Gruppen nutzbar.
+- Profilzugriff für eigene und aktive gemeinsame Mitgliedschaften, Rechteentzug
+  nach Austritt, Wiederaufnahme sowie Sperren für Fremde und anonyme Clients.
 
 Die mobile Clientinitialisierung und die Anmeldeoberfläche werden dabei nicht geprüft.
 `npm test` und `npm run check` schließen Integrationstests aus und
@@ -216,3 +234,35 @@ Datenbankport `54322`. Keine Cloud-Änderung und kein Deployment.
 Die gemeinsamen Entscheidungen und das bisherige Austrittsverhalten wurden
 für diesen Abschluss nicht geändert. Controller- und View-Verhalten sind nicht
 Gegenstand dieser lokalen Prüfung.
+
+### Ergänzung: Registrierung und Profile
+
+Die rein lokale Profil-Migration enthält nun den Trigger auf `auth.users`.
+Alle Fixtures für neue Auth-Konten liefern Benutzernamen als Metadaten.
+Die Profiltests simulieren Altkonten durch gezieltes Entfernen ihrer Fixture-Profile
+mit dem lokalen Service-Role-Client; der Registrierungstrigger bleibt aktiv.
+Die Unit-Tests prüfen beide Rückgabevarianten der Registrierung, auch die
+ausstehende E-Mail-Bestätigung. Integrationstests verwenden die unveränderte
+lokale Auth-Konfiguration ohne Bestätigungspflicht.
+
+Der erste Integrationslauf bestand 58 von 64 Tests. Sechs neue Fehlerprüfungen
+erwarteten fälschlich `error.code = unexpected_failure`. Der lokale Auth-Dienst
+liefert diesen Wert zwar im HTTP-Body, das installierte SDK wirft bei HTTP 500
+aber einen `AuthRetryableFetchError` ohne `code`. Nach Abgleich mit HTTP-Antwort
+und SDK-Quellcode wurden die Erwartungen auf Fehlertyp, Status und Meldung
+korrigiert. Der anschließende gezielte Lauf bestand alle sieben Registrierungstests.
+
+Prüfung am Profil-Commit `a3af3f1` während des interaktiven Rebase:
+
+| Prüfung                                                                | Ergebnis                                                                                                                                                                                                                   |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run supabase -- db reset --local`                                 | Erfolgreich; alle 19 Migrationen aus dem aktuellen Checkout angewendet, einschließlich Profil- und Registrierungstrigger.                                                                                                  |
+| Datenbanktypen lokal neu generiert und mit Projekt-Prettier formatiert | Identisch zu `src/model/database.types.ts`; keine Änderung erforderlich.                                                                                                                                                   |
+| Lokales Schema per SQL geprüft                                         | Trigger auf `auth.users`, private `SECURITY DEFINER`-Funktion mit leerem `search_path`; nur `postgres` hat Ausführungsrechte. Profil-Lesepolicy unverändert.                                                               |
+| `npm run check`                                                        | Erfolgreich: ESLint, TypeScript, 3 Unit-Testsuites mit 16 Tests.                                                                                                                                                           |
+| `npm run test:integration`                                             | Abschließender Gesamtlauf erfolgreich: 8 Testsuites mit 64 Tests; Registrierung samt Profil, fehlende/leere und doppelte Namen, Rollback, erneuter Versuch mit derselben E-Mail und Anmeldung eines Altkontos ohne Profil. |
+| `git diff --check`                                                     | Erfolgreich; keine Whitespace-Fehler.                                                                                                                                                                                      |
+
+Nur lokale Supabase-Arbeiten; keine Cloud-Änderung und kein Deployment.
+Git wurde ausschließlich lesend verwendet. Staging, Amend, Stash und
+Fortsetzung des Rebase bleiben beim Menschen.

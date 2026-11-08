@@ -96,6 +96,7 @@ describe('Model integration with local Supabase', () => {
       email: userEmail,
       password: testPassword,
       email_confirm: true,
+      user_metadata: { username: `integration-${randomUUID()}` },
     });
 
     if (error) {
@@ -112,6 +113,7 @@ describe('Model integration with local Supabase', () => {
       email: otherUserEmail,
       password: testPassword,
       email_confirm: true,
+      user_metadata: { username: `integration-other-${randomUUID()}` },
     });
 
     if (otherError) {
