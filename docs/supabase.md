@@ -3,7 +3,9 @@
 Das Team nutzt Supabase Cloud. Nur Mohammad (Model) entwickelt zusätzlich lokal mit Docker.
 Alle Befehle im Projektordner ausführen.
 
-Das aktuelle Schema ist im [Datenmodell für User Story 1](datenmodell.md) dargestellt.
+Das aktuelle Schema steht im [Datenmodell für User Story 1 und 2](datenmodell.md).
+Die US2-Erweiterungen wurden lokal geprüft. Die Übertragung in die gemeinsame
+Cloud ist ein separater Schritt nach Review und Merge.
 
 ## App einrichten
 
@@ -24,16 +26,16 @@ Für den Team-Alltag ist kein Docker nötig. Die Cloud-Datenbank ist gemeinsam;
 
 ## Übergabe an Controller und View
 
-Der Controller nutzt die Funktionen aus `@model`:
+Der Controller importiert die öffentlichen Funktionen und Typen aus `@model`.
+Die [Model-API](model-api.md) beschreibt Aufrufe, Berechtigungen, erwartete
+Zustandswerte, atomare Speicherung und Fehlerbehandlung.
 
-- `signIn(email, password)`: vorhandenes Konto anmelden; liefert `id` und `email`.
-- `getGroupsForUser(user.id)`: eigene Gruppen laden.
-- `getSessionsForGroup(group.id)`: Sessions mit Ort laden, aufsteigend nach
-  `starts_at` sortiert. Der Controller wählt die nächste Session.
+Aktuelle Gruppenmitgliedschaft erfordert `is_active = true`.
+Erhaltene Mitgliedschaftsdatensätze ehemaliger Mitglieder gewähren keinen Zugriff.
 
-Die View bindet Anmeldung und Anzeige über den Controller an.
-Lesen erfordert Anmeldung und Gruppenmitgliedschaft. Leere Ergebnisse sind `[]`;
-Fehler werden geworfen und im Controller behandelt.
+Die View bindet Anmeldung und Datenzugriff über den Controller an.
+Der Controller behandelt geworfene Fehler und berechnet die Anwendungslogik
+für Hostauswahl, Rotation, Buchungen, Stornierungen, Tausch und Nachfolge.
 
 ## Lokal entwickeln · Model
 
@@ -81,6 +83,19 @@ SQL in die erzeugte Datei schreiben und bei laufender lokaler Datenbank anwenden
 npm run supabase -- migration up --local
 ```
 
+Nach Schema- oder RPC-Signaturänderungen die öffentlichen Datenbanktypen
+neu erzeugen. Beispiel für Bash/WSL:
+
+```bash
+if npm run --silent supabase -- gen types typescript --local --schema public > /tmp/board-gamer-types.ts; then
+  cp /tmp/board-gamer-types.ts src/model/database.types.ts
+  npx --no-install prettier --write src/model/database.types.ts
+fi
+```
+
+Die temporäre Datei verhindert das Überschreiben der bisherigen Typen bei
+fehlgeschlagener Generierung. `--silent` unterdrückt npm-Ausgaben im TypeScript-Inhalt.
+
 Zum Testen des vollständigen Neuaufbaus:
 
 > **Achtung:** Der folgende Befehl löscht alle lokalen Daten. Benötigte Daten vorher sichern.
@@ -91,9 +106,18 @@ Zum Testen des vollständigen Neuaufbaus:
 npm run supabase -- db reset --local
 ```
 
-Verhalten lokal prüfen, `npm run check` ausführen und Migrationen mit dem zugehörigen Code
-zum Review geben. Bereits in der Cloud angewendete Migrationen nicht ändern;
-Korrekturen als neue anlegen.
+Verhalten lokal prüfen, `npm run check` und `npm run test:integration` ausführen
+und Migrationen mit dem zugehörigen Code zum Review geben.
+Bereits angewendete Migrationen nicht nachträglich ändern;
+Korrekturen als neue Migrationen anlegen.
+
+Ausnahme in diesem noch nicht gemeinsam verwendeten US2-Arbeitsstand:
+Die Dauer wurde am 08.11.2026 in die ursprünglichen lokalen US2-Migrationen
+aufgenommen. Die zusätzliche, nicht angewendete Duration-Migration wurde
+entfernt und die lokale Testdatenbank vollständig neu aufgebaut.
+Die bereits gemeinsam genutzten Migrationen aus `main` bleiben unverändert.
+`20261104220141_fix_hosting_conflict_errors.sql` erwartet weiterhin die
+ursprünglichen `40001`-Definitionen und ersetzt sie beim Aufbau durch `PT409`.
 
 ## Cloud aktualisieren · Model
 
@@ -137,9 +161,9 @@ Weiterführend:
 
 ## Integrationstests · Model
 
-Die Integrationstests prüfen die Model-Abfragen gegen die lokale
-Supabase-Instanz. Sie benötigen Docker, laufendes Supabase und die
-angewendeten lokalen Migrationen.
+Die Integrationstests prüfen die Model-Abfragen und geschützten Schreiboperationen
+gegen die lokale Supabase-Instanz. Sie benötigen Docker, laufendes Supabase und
+die angewendeten lokalen Migrationen.
 
 In `.env.integration.local` die lokalen Werte aus
 `npm run supabase -- status -o env` eintragen:
@@ -150,19 +174,45 @@ SUPABASE_TEST_ANON_KEY=<lokaler ANON_KEY>
 SUPABASE_TEST_SERVICE_ROLE_KEY=<lokaler SERVICE_ROLE_KEY>
 ```
 
-Die Datei wird von Git ignoriert. Der Service-Role-Key wird nur zur
-Vorbereitung und Bereinigung der Testdaten verwendet. Die Lesetests verwenden
-den Anon-Key mit echten Benutzersitzungen. Weitere Anfragen ohne Anmeldung
-prüfen die Zugriffssperre.
+Die Datei wird von Git ignoriert. Die Tests lassen nur lokale HTTP-Ziele zu.
+Der Service-Role-Key wird ausschließlich für Fixtures, Bereinigung und direkte
+Integritätsprüfungen verwendet. Die Model-Aufrufe nutzen den Anon-Key mit echten
+Benutzersitzungen. Weitere Anfragen ohne Anmeldung prüfen die Zugriffssperre.
 
 ```bash
 npm run test:integration
 ```
 
-Die Tests erstellen eigene Daten und entfernen sie anschließend. Sie prüfen
-die Model-Anmeldung, Gruppenfilter, Session-Reihenfolge, zugehörige Orte und
-RLS einschließlich gesperrter Schreibzugriffe. Die mobile Clientinitialisierung
-und die Anmeldeoberfläche werden dabei nicht geprüft.
+Die Tests erstellen eigene Daten und entfernen sie anschließend. Sie prüfen:
 
+- Model-Anmeldung, Gruppenfilter, Session-Reihenfolge und zugehörige Orte.
+- RLS, gesperrte direkte App-Schreibzugriffe und geschützte RPC-Berechtigungen.
+- Aktive und historische Mitgliedschaften, Aufnahme, Austritt und Wiedereintritt.
+- Hosting-Positionen, Hostreferenzen, Bestätigung und atomaren Rollback.
+- Speichern, Lesen und Ändern der Dauer einschließlich 30 und 1440 Minuten,
+  ungültige Werte, `NULL`-Altdaten und unvollständige Snapshots.
+- `PT409` bei konkurrierenden Änderungen, auch allein an der Dauer.
+
+Die mobile Clientinitialisierung und die Anmeldeoberfläche werden dabei nicht geprüft.
 `npm test` und `npm run check` schließen Integrationstests aus und
 benötigen keine lokale Supabase-Instanz.
+
+## Lokales Prüfprotokoll · 08.11.2026
+
+Geprüft auf `model/host-rotation` mit der Projekt-CLI `2.122.0` gegen den
+Docker-Container `supabase_db_DLBCSEMSE02_D_Board_Gamer`.
+Lokales Ziel: Datenbank `postgres`, API `http://127.0.0.1:54321`,
+Datenbankport `54322`. Keine Cloud-Änderung und kein Deployment.
+
+| Prüfung                                                                     | Ergebnis                                                                                                                                                                    |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run supabase -- db reset --local`                                      | Erfolgreich; alle 18 Migrationen einschließlich der Konfliktkorrektur angewendet, ohne zusätzliche Duration-Migration.                                                      |
+| `npm run --silent supabase -- gen types typescript --local --schema public` | Erfolgreich; erst in eine temporäre Datei geschrieben, danach `src/model/database.types.ts` ersetzt und mit Prettier formatiert.                                            |
+| Lokales Schema per SQL geprüft                                              | `duration_minutes`: nullable `integer`, kein Standardwert; je eine neue öffentliche/private Create- und Update-Signatur; Session-Guard enthält `PT409`, nicht mehr `40001`. |
+| `npm run check`                                                             | Erfolgreich: ESLint, TypeScript und 3 Unit-Testsuites mit 12 Tests.                                                                                                         |
+| `npm run test:integration`                                                  | Erfolgreich: 6 Testsuites mit 46 Tests einschließlich Dauer, Altdaten, Rollback und Konflikten.                                                                             |
+| `git --no-pager diff --check`                                               | Erfolgreich; keine Whitespace-Fehler.                                                                                                                                       |
+
+Die gemeinsamen Entscheidungen und das bisherige Austrittsverhalten wurden
+für diesen Abschluss nicht geändert. Controller- und View-Verhalten sind nicht
+Gegenstand dieser lokalen Prüfung.

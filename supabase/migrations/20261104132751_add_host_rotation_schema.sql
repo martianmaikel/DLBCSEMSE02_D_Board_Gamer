@@ -50,8 +50,12 @@ alter table public.groups
 alter table public.sessions
   add column planned_host_membership_id uuid,
   add column actual_host_membership_id uuid,
+  add column duration_minutes integer,
   add column status public.session_status
     not null default 'scheduled',
+
+  add constraint sessions_duration_minutes_range
+    check (duration_minutes between 30 and 1440),
 
   add constraint sessions_planned_host_same_group_fk
     foreign key (group_id, planned_host_membership_id)
@@ -88,3 +92,6 @@ comment on column public.sessions.planned_host_membership_id is
 
 comment on column public.sessions.actual_host_membership_id is
   'Actual host, optionally designated before confirmation and required for completed sessions.';
+
+comment on column public.sessions.duration_minutes is
+  'Session duration in minutes, from 30 to 1440. No default; legacy sessions may retain NULL. Required by protected creation and editing operations.';

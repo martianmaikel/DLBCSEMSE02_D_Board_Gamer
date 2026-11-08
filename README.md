@@ -44,15 +44,20 @@ src/
   view/             Screens, Navigation, UI       -> nutzt @controller
   controller/       Anwendungslogik               -> nutzt @model
   model/            Datenmodell, Persistenz
-supabase/           Lokale Supabase-Konfiguration
+supabase/           Supabase-Konfiguration und Migrationen
 docs/
   konzept.md         User Stories, Annahmen, offene Punkte
   entscheidungen.md  Entscheidungslog
   ki-einsatz.md      Dokumentation des KI-Einsatzes
-  supabase.md        Supabase-Einrichtung
+  datenmodell.md     Tabellen, Beziehungen und Integrität
+  model-api.md       Öffentliche Model-Schnittstelle
+  supabase.md        Einrichtung, Migrationen und Tests
 ```
 
 Die Abhängigkeitsrichtung view -> controller -> model wird per ESLint geprüft.
+
+Model-Dokumentation: [Datenmodell](docs/datenmodell.md),
+[Model-API](docs/model-api.md) und [Supabase](docs/supabase.md).
 
 ## Mitarbeit
 

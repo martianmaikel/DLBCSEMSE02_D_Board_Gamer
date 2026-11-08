@@ -1,11 +1,14 @@
-# Datenmodell – User Story 1
+# Datenmodell – User Story 1 und 2
 
-Implementierter Stand vom 03.11.2026: vier Anwendungstabellen im Schema `public`
-für Gruppen und ihre Session-Termine mit Zeit und Ort.
+Stand: 08.11.2026. Die US2-Erweiterungen sind auf dem Feature-Branch lokal
+implementiert und getestet. Die US2-Migrationen wurden in diesem Arbeitsstand
+nur lokal angewendet.
+
 Maßgeblich sind die [SQL-Migrationen](../supabase/migrations/).
+`auth.users` gehört zu Supabase Auth und wird nicht durch unsere Migrationen
+angelegt.
 
-`auth.users` gehört zu Supabase Auth. Die Tabelle wird hier nur mit ihrer ID
-als Referenz dargestellt und nicht durch unsere Migrationen angelegt.
+## Tabellen und Beziehungen
 
 ```mermaid
 erDiagram
@@ -14,6 +17,9 @@ erDiagram
     groups ||..o{ locations : hat
     groups ||..o{ sessions : hat
     locations ||..o{ sessions : "ist Ort von"
+    memberships |o..o| groups : verwaltet
+    memberships |o..o{ sessions : "geplanter Host"
+    memberships |o..o{ sessions : "tatsaechlicher Host"
 
     "auth.users" {
         uuid id PK
@@ -22,12 +28,17 @@ erDiagram
     groups {
         uuid id PK
         text name
+        uuid admin_membership_id FK "nullable"
     }
 
     memberships {
         uuid id PK
         uuid group_id FK
         uuid user_id FK
+        boolean is_active
+        boolean willing_to_host
+        integer host_position "nullable"
+        timestamptz joined_at "Legacy nullable"
     }
 
     locations {
@@ -41,29 +52,119 @@ erDiagram
         uuid group_id FK
         uuid location_id FK
         timestamptz starts_at
+        integer duration_minutes "Legacy nullable"
+        uuid planned_host_membership_id FK "Legacy nullable"
+        uuid actual_host_membership_id FK "nullable"
+        session_status status
     }
 ```
 
-`PK` = Primärschlüssel, `FK` = Fremdschlüssel. `||` bedeutet genau einen
-Datensatz, `o{` bedeutet null bis beliebig viele Datensätze.
-Alle Spalten der vier Anwendungstabellen sind Pflichtfelder.
+`PK` = Primärschlüssel, `FK` = Fremdschlüssel. `||` bedeutet genau einen,
+`|o` beziehungsweise `o|` null oder einen und `o{` null bis beliebig viele
+Datensätze.
 
-## Datenbankregeln
+`session_status` enthält `scheduled`, `completed` und `cancelled`.
+Ein vergangener Termin allein ändert den Status nicht.
 
-- `UNIQUE (group_id, user_id)` verhindert doppelte Mitgliedschaften in derselben Gruppe.
-- `UNIQUE (group_id, id)` in `locations` ermöglicht den zusammengesetzten
-  Fremdschlüssel `sessions (group_id, location_id) → locations (group_id, id)`.
-  Damit darf eine Session nur einen Ort ihrer eigenen Gruppe verwenden.
+## Session-Dauer
+
+`sessions.duration_minutes` ist eine Ganzzahl ohne Standardwert.
+Gesetzte Werte liegen einschließlich der Grenzen zwischen 30 und 1440 Minuten.
+Bestehende Sessions dürfen `NULL` behalten; eine unbekannte Dauer wird nicht
+nachträglich geschätzt.
+
+Die geschützten Operationen `create_session` und `update_session` verlangen
+`session_duration_minutes` mit einem gültigen Wert. Auch beim Bearbeiten einer
+alten Session muss die Dauer angegeben werden. Dauer, Session-Daten und optionale
+Orts- und Positionsänderungen werden innerhalb derselben Transaktion gespeichert.
+
+Der erwartete Session-Zustand enthält `duration_minutes`, bei Altdaten auch
+`null`. Bearbeiten, Absagen, Benennen des tatsächlichen Hosts und Bestätigen
+vergleichen dieses Feld mit dem gespeicherten Wert. Schon eine konkurrierende
+Änderung allein an der Dauer führt bei einem veralteten Snapshot zu `PT409`.
+
+## Mitgliedschaft und Hosting-Reihenfolge
+
+- Eine aktuelle Mitgliedschaft erfordert die passende Gruppe und Nutzer-ID
+  sowie `is_active = true`. Das Vorhandensein eines Mitgliedschaftsdatensatzes
+  allein genügt nicht.
+- Beim Austritt bleibt derselbe Datensatz mit `is_active = false` erhalten.
+  Sein `host_position` wird geleert; historische Hostreferenzen bleiben gültig.
+- Beim Wiedereintritt wird derselbe Datensatz reaktiviert. `joined_at` wird auf
+  den Beginn der neuen ununterbrochenen Mitgliedschaft gesetzt.
+  Die bisherige Hosting-Bereitschaft bleibt erhalten; die frühere Position
+  wird nicht wiederhergestellt.
+- `host_position` speichert die Reihenfolge innerhalb einer Gruppe.
+  Eine gesetzte Position ist positiv, innerhalb der Gruppe eindeutig und
+  nur für aktive, hostingbereite Mitglieder zulässig.
+- `NULL` bedeutet keine zugewiesene Position. Lücken sind erlaubt.
+  Verschiedene Gruppen dürfen dieselben Positionsnummern verwenden.
+- Die Eindeutigkeit ist aufschiebbar, damit Positionen innerhalb einer
+  geschützten Speicheroperation atomar getauscht werden können.
+
+## Administration und Sessions
+
+- Die geschützte Gruppenerstellung speichert Gruppe, aktive Mitgliedschaft
+  des Erstellers und Administratorreferenz gemeinsam.
+- Beim Austritt des Administrators speichert die Austrittsoperation einen
+  ausdrücklich übergebenen, anderen aktiven Nachfolger derselben Gruppe.
+  Solange weitere aktive Mitglieder vorhanden sind, ist ein Nachfolger nötig.
+- Verlässt das letzte Mitglied die Gruppe, wird `admin_membership_id` auf
+  `NULL` gesetzt. Gruppe und historische Mitgliedschaft bleiben erhalten.
+- Ein Wiedereintritt stellt eine frühere Administratorrolle nicht wieder her.
+- Geplanter und tatsächlicher Host werden getrennt gespeichert.
+  Eine Session mit `status = completed` benötigt einen tatsächlichen Host.
+- Die geschützte Bestätigung speichert tatsächlichen Host und Abschlussstatus
+  gemeinsam und erhält den geplanten Host.
+
+Hostauswahl, Rotationsfortschritt, Buchungs- und Stornierungsverarbeitung,
+Tauschlogik sowie die Auswahl des ältesten verbleibenden Mitglieds als
+Nachfolger gehören zum Controller. Die Datenbank prüft Berechtigungen und
+Integrität und speichert zusammengehörige Änderungen atomar.
+
+## Integrität und Übergangsdaten
+
+- `UNIQUE (group_id, user_id)` verhindert doppelte Mitgliedschaften.
+- Zusammengesetzte Fremdschlüssel halten die Administratorreferenz,
+  beide Hostreferenzen und den Session-Ort innerhalb derselben Gruppe.
+  Grundlage sind eindeutige Kombinationen aus `group_id` und `id`
+  in `memberships` beziehungsweise `locations`.
+
+| Feld                                  | Bedeutung von `NULL`                                                                         |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `groups.admin_membership_id`          | Bestehende Testgruppe ohne initialisierte Administration oder Gruppe ohne aktive Mitglieder. |
+| `memberships.host_position`           | Keine zugewiesene Hosting-Position.                                                          |
+| `memberships.joined_at`               | Nur bestehende Legacy-Testdaten ohne bekannten Beginn.                                       |
+| `sessions.planned_host_membership_id` | Nur bestehende Legacy-Testdaten ohne geplanten Host.                                         |
+| `sessions.actual_host_membership_id`  | Noch kein tatsächlicher Host festgelegt; bei `completed` unzulässig.                         |
+| `sessions.duration_minutes`           | Unbekannte Dauer einer alten Session; beim Erstellen und Bearbeiten per RPC unzulässig.      |
+
+Die erforderlichen Werte für `joined_at` und `planned_host_membership_id`
+werden durch `CHECK ... NOT VALID` abgesichert. Bestehende Legacy-Zeilen
+können zunächst `NULL` behalten; neue und aktualisierte Zeilen müssen
+die Prüfungen erfüllen. Alte Beitrittszeiten werden nicht erfunden.
 
 ## Datenzugriff
 
-- `getGroupsForUser(userId)` liefert die Gruppen des angegebenen Nutzers.
-- `getSessionsForGroup(groupId)` liefert die Sessions dieser Gruppe mit Ort,
-  aufsteigend nach `starts_at` sortiert. Der Controller bestimmt daraus die nächste Session.
-- Eine Anmeldung zur Teilnahme an einer Session (RSVP) ist zum Anzeigen nicht erforderlich.
-- `signIn(email, password)` meldet einen bestehenden Account an und liefert
-  dessen `id` und `email`.
+- `getGroupsForUser(userId)` liefert Gruppen über aktive Mitgliedschaften
+  des angegebenen Nutzers innerhalb der RLS-Berechtigungen des Aufrufers.
+- `getActiveMembersForGroup(groupId)` liefert aktuelle Mitglieder mit
+  Hosting-Bereitschaft und Position.
+- `getMembersForGroupIncludingInactive(groupId)` liefert auch die erhaltenen
+  Mitgliedschaften ehemaliger Mitglieder.
+- `isActiveGroupMember(groupId, userId)` prüft eine aktuelle Mitgliedschaft.
+- `getSessionsForGroup(groupId)` liefert Sessions aller Status mit Ort,
+  aufsteigend nach `starts_at`. Der Controller bestimmt die nächste Session.
+- `signIn(email, password)` meldet einen bestehenden Account an.
 
-RLS beschränkt Lesezugriffe auf angemeldete Gruppenmitglieder. Mitgliedschaften
-sind nur für den jeweiligen Nutzer sichtbar. Nicht angemeldete Clients haben
-keinen Lesezugriff; Schreibzugriffe aus der App sind gesperrt.
+RLS erlaubt angemeldeten aktuellen Mitgliedern die Lesezugriffe auf ihre
+Gruppe, deren Orte, Sessions und sämtliche Mitgliedschaften dieser Gruppe.
+Ausgetretene Mitglieder und nicht angemeldete Clients erhalten keinen Zugriff
+auf diese Gruppendaten.
+
+Direkte `INSERT`-, `UPDATE`- und `DELETE`-Zugriffe aus der App bleiben gesperrt.
+Autorisierte Änderungen erfolgen über geschützte RPC-Operationen, die durch
+die öffentlichen Model-Funktionen aufgerufen werden.
+
+Einzelheiten zu Einrichtung und Model-Schnittstelle stehen in
+[Supabase](supabase.md).

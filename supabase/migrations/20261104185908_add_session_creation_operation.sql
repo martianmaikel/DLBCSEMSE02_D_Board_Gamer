@@ -51,6 +51,7 @@ create function private.create_session(
   target_group_id uuid,
   planned_host_id uuid,
   session_starts_at timestamptz,
+  session_duration_minutes integer,
   session_location_id uuid default null,
   new_location_address text default null,
   position_changes jsonb default '[]'::jsonb
@@ -69,6 +70,12 @@ begin
 
   if session_starts_at is null then
     raise exception 'Session start time is required'
+      using errcode = '22023';
+  end if;
+
+  if session_duration_minutes is null
+      or session_duration_minutes not between 30 and 1440 then
+    raise exception 'Session duration must be between 30 and 1440 minutes'
       using errcode = '22023';
   end if;
 
@@ -126,6 +133,7 @@ begin
     group_id,
     location_id,
     starts_at,
+    duration_minutes,
     planned_host_membership_id,
     actual_host_membership_id,
     status
@@ -134,6 +142,7 @@ begin
     target_group_id,
     selected_location_id,
     session_starts_at,
+    session_duration_minutes,
     planned_host_id,
     null,
     'scheduled'
@@ -154,13 +163,13 @@ $$;
 
 revoke all
 on function private.create_session(
-  uuid, uuid, timestamptz, uuid, text, jsonb
+  uuid, uuid, timestamptz, integer, uuid, text, jsonb
 )
 from public, anon, authenticated;
 
 grant execute
 on function private.create_session(
-  uuid, uuid, timestamptz, uuid, text, jsonb
+  uuid, uuid, timestamptz, integer, uuid, text, jsonb
 )
 to authenticated;
 
@@ -168,6 +177,7 @@ create function public.create_session(
   target_group_id uuid,
   planned_host_id uuid,
   session_starts_at timestamptz,
+  session_duration_minutes integer,
   session_location_id uuid default null,
   new_location_address text default null,
   position_changes jsonb default '[]'::jsonb
@@ -181,6 +191,7 @@ as $$
     target_group_id,
     planned_host_id,
     session_starts_at,
+    session_duration_minutes,
     session_location_id,
     new_location_address,
     position_changes
@@ -189,17 +200,17 @@ $$;
 
 revoke all
 on function public.create_session(
-  uuid, uuid, timestamptz, uuid, text, jsonb
+  uuid, uuid, timestamptz, integer, uuid, text, jsonb
 )
 from public, anon, authenticated;
 
 grant execute
 on function public.create_session(
-  uuid, uuid, timestamptz, uuid, text, jsonb
+  uuid, uuid, timestamptz, integer, uuid, text, jsonb
 )
 to authenticated;
 
 comment on function public.create_session(
-  uuid, uuid, timestamptz, uuid, text, jsonb
+  uuid, uuid, timestamptz, integer, uuid, text, jsonb
 ) is
-  'Administrator-only session creation with an existing location or a new address. Optional Controller-computed position changes are saved in the same transaction.';
+  'Administrator-only session creation with a required duration of 30 to 1440 minutes and an existing location or a new address. Optional Controller-computed position changes are saved in the same transaction.';

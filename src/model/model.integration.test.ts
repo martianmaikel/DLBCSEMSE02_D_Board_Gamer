@@ -182,6 +182,7 @@ describe('Model integration with local Supabase', () => {
           group_id: groupA,
           location_id: locationA,
           starts_at: '2030-06-20T18:00:00Z',
+          duration_minutes: 180,
           planned_host_membership_id: membershipA,
         },
         {
@@ -189,6 +190,7 @@ describe('Model integration with local Supabase', () => {
           group_id: groupA,
           location_id: locationA,
           starts_at: '2030-06-10T18:00:00Z',
+          duration_minutes: null,
           planned_host_membership_id: membershipA,
         },
         {
@@ -196,6 +198,7 @@ describe('Model integration with local Supabase', () => {
           group_id: otherGroup,
           location_id: otherLocation,
           starts_at: '2030-06-01T18:00:00Z',
+          duration_minutes: 120,
           planned_host_membership_id: otherMembership,
         },
       ])
@@ -285,6 +288,7 @@ describe('Model integration with local Supabase', () => {
     const sessions = await getSessionsForGroup(groupA);
 
     expect(sessions.map((session) => session.id)).toEqual([earlySession, lateSession]);
+    expect(sessions.map((session) => session.duration_minutes)).toEqual([null, 180]);
 
     for (const session of sessions) {
       expect(session.group_id).toBe(groupA);

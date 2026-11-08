@@ -64,6 +64,7 @@ describe('US2 database constraints with local Supabase', () => {
       groupId: first.group.id,
       plannedHostMembershipId: first.ownerMembershipId,
       startsAt: '2030-06-10T18:00:00Z',
+      durationMinutes: 120,
       location: {
         kind: 'new',
         address: 'US2 first group location',
@@ -74,6 +75,7 @@ describe('US2 database constraints with local Supabase', () => {
       groupId: second.group.id,
       plannedHostMembershipId: second.ownerMembershipId,
       startsAt: '2030-06-11T18:00:00Z',
+      durationMinutes: 120,
       location: {
         kind: 'new',
         address: 'US2 second group location',
@@ -129,6 +131,7 @@ describe('US2 database constraints with local Supabase', () => {
       groupId: group.id,
       plannedHostMembershipId: ownerMembershipId,
       startsAt: '2020-06-10T18:00:00Z',
+      durationMinutes: 120,
       location: {
         kind: 'new',
         address: 'US2 session constraints location',
@@ -173,5 +176,28 @@ describe('US2 database constraints with local Supabase', () => {
       actual_host_membership_id: ownerMembershipId,
       status: 'completed',
     });
+  });
+
+  it('enforces the duration range independently of protected RPC validation', async () => {
+    const { group, ownerMembershipId } = await createHostingGroup();
+    const session = await createSession({
+      groupId: group.id,
+      plannedHostMembershipId: ownerMembershipId,
+      startsAt: '2020-06-10T18:00:00Z',
+      durationMinutes: 120,
+      location: { kind: 'new', address: 'Duration constraint' },
+    });
+
+    for (const durationMinutes of [29, 1441]) {
+      const result = await fixtureAdmin
+        .from('sessions')
+        .update({ duration_minutes: durationMinutes })
+        .eq('id', session.id);
+      expect(result.error?.code).toBe('23514');
+    }
+
+    const stored = await fixtureAdmin.from('sessions').select().eq('id', session.id).single();
+    expect(stored.error).toBeNull();
+    expect(stored.data).toEqual(session);
   });
 });

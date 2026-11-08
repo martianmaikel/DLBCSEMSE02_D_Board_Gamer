@@ -4,6 +4,7 @@ create function private.update_session(
   expected_session jsonb,
   planned_host_id uuid,
   session_starts_at timestamptz,
+  session_duration_minutes integer,
   session_location_id uuid default null,
   new_location_address text default null,
   position_changes jsonb default '[]'::jsonb
@@ -33,6 +34,12 @@ begin
 
   if session_starts_at is null then
     raise exception 'Session start time is required'
+      using errcode = '22023';
+  end if;
+
+  if session_duration_minutes is null
+      or session_duration_minutes not between 30 and 1440 then
+    raise exception 'Session duration must be between 30 and 1440 minutes'
       using errcode = '22023';
   end if;
 
@@ -89,6 +96,7 @@ begin
   update public.sessions
   set
     starts_at = session_starts_at,
+    duration_minutes = session_duration_minutes,
     location_id = selected_location_id,
     planned_host_membership_id = planned_host_id
   where id = target_session_id
@@ -108,13 +116,13 @@ $$;
 
 revoke all
 on function private.update_session(
-  uuid, jsonb, uuid, timestamptz, uuid, text, jsonb
+  uuid, jsonb, uuid, timestamptz, integer, uuid, text, jsonb
 )
 from public, anon, authenticated;
 
 grant execute
 on function private.update_session(
-  uuid, jsonb, uuid, timestamptz, uuid, text, jsonb
+  uuid, jsonb, uuid, timestamptz, integer, uuid, text, jsonb
 )
 to authenticated;
 
@@ -123,6 +131,7 @@ create function public.update_session(
   expected_session jsonb,
   planned_host_id uuid,
   session_starts_at timestamptz,
+  session_duration_minutes integer,
   session_location_id uuid default null,
   new_location_address text default null,
   position_changes jsonb default '[]'::jsonb
@@ -137,6 +146,7 @@ as $$
     expected_session,
     planned_host_id,
     session_starts_at,
+    session_duration_minutes,
     session_location_id,
     new_location_address,
     position_changes
@@ -145,17 +155,17 @@ $$;
 
 revoke all
 on function public.update_session(
-  uuid, jsonb, uuid, timestamptz, uuid, text, jsonb
+  uuid, jsonb, uuid, timestamptz, integer, uuid, text, jsonb
 )
 from public, anon, authenticated;
 
 grant execute
 on function public.update_session(
-  uuid, jsonb, uuid, timestamptz, uuid, text, jsonb
+  uuid, jsonb, uuid, timestamptz, integer, uuid, text, jsonb
 )
 to authenticated;
 
 comment on function public.update_session(
-  uuid, jsonb, uuid, timestamptz, uuid, text, jsonb
+  uuid, jsonb, uuid, timestamptz, integer, uuid, text, jsonb
 ) is
-  'Administrator-only editing of a scheduled session with optimistic state checks and optional atomic position changes. Actual host and completion status are unchanged.';
+  'Administrator-only editing of a scheduled session with a required duration of 30 to 1440 minutes, optimistic state checks including duration, and optional atomic position changes. Actual host and completion status are unchanged.';

@@ -50,6 +50,7 @@ describe('US2 hosting sessions with local Supabase', () => {
       groupId: group.id,
       plannedHostMembershipId: memberMembershipId,
       startsAt: '2030-06-10T18:00:00Z',
+      durationMinutes: 120,
       location: { kind: 'new', address: 'US2 location A' },
       positionChanges: [
         {
@@ -64,6 +65,7 @@ describe('US2 hosting sessions with local Supabase', () => {
       groupId: group.id,
       plannedHostMembershipId: otherMembershipId,
       startsAt: '2030-06-20T18:00:00Z',
+      durationMinutes: 180,
       location: { kind: 'existing', locationId: first.location_id },
     });
 
@@ -106,6 +108,7 @@ describe('US2 hosting sessions with local Supabase', () => {
       expectedSession: first,
       plannedHostMembershipId: ownerMembershipId,
       startsAt: '2030-06-11T18:00:00Z',
+      durationMinutes: 240,
       location: { kind: 'existing', locationId: first.location_id },
     });
 
@@ -128,6 +131,7 @@ describe('US2 hosting sessions with local Supabase', () => {
         groupId: group.id,
         plannedHostMembershipId: memberMembershipId,
         startsAt: '2030-07-01T18:00:00Z',
+        durationMinutes: 120,
         location: { kind: 'existing', locationId: first.location_id },
       }),
     ).rejects.toMatchObject({ code: '42501' });
@@ -137,6 +141,7 @@ describe('US2 hosting sessions with local Supabase', () => {
         expectedSession: updated,
         plannedHostMembershipId: memberMembershipId,
         startsAt: updated.starts_at,
+        durationMinutes: 120,
         location: { kind: 'existing', locationId: updated.location_id },
       }),
     ).rejects.toMatchObject({ code: '42501' });
@@ -166,6 +171,7 @@ describe('US2 hosting sessions with local Supabase', () => {
         groupId: group.id,
         plannedHostMembershipId: memberMembershipId,
         startsAt: '2030-08-01T18:00:00Z',
+        durationMinutes: 120,
         location: { kind: 'new', address: 'US2 rollback location' },
         positionChanges: [
           {
@@ -198,6 +204,7 @@ describe('US2 hosting sessions with local Supabase', () => {
       groupId: group.id,
       plannedHostMembershipId: memberMembershipId,
       startsAt: '2030-09-01T18:00:00Z',
+      durationMinutes: 120,
       location: { kind: 'new', address: 'US2 cancellation location' },
     });
 
@@ -205,6 +212,7 @@ describe('US2 hosting sessions with local Supabase', () => {
       groupId: group.id,
       plannedHostMembershipId: otherMembershipId,
       startsAt: '2030-09-10T18:00:00Z',
+      durationMinutes: 120,
       location: { kind: 'existing', locationId: first.location_id },
     });
 
@@ -267,6 +275,7 @@ describe('US2 hosting sessions with local Supabase', () => {
         expectedSession: cancelled,
         plannedHostMembershipId: memberMembershipId,
         startsAt: cancelled.starts_at,
+        durationMinutes: 120,
         location: { kind: 'existing', locationId: cancelled.location_id },
       }),
     ).rejects.toMatchObject({ code: '22023' });
@@ -279,6 +288,7 @@ describe('US2 hosting sessions with local Supabase', () => {
       groupId: group.id,
       plannedHostMembershipId: memberMembershipId,
       startsAt: '2020-06-01T18:00:00Z',
+      durationMinutes: 120,
       location: { kind: 'new', address: 'US2 confirmation location' },
     });
 
@@ -326,6 +336,7 @@ describe('US2 hosting sessions with local Supabase', () => {
         expectedSession: completed,
         plannedHostMembershipId: memberMembershipId,
         startsAt: completed.starts_at,
+        durationMinutes: 120,
         location: { kind: 'existing', locationId: completed.location_id },
       }),
     ).rejects.toMatchObject({ code: '22023' });
@@ -338,6 +349,7 @@ describe('US2 hosting sessions with local Supabase', () => {
       groupId: group.id,
       plannedHostMembershipId: memberMembershipId,
       startsAt: '2020-07-01T18:00:00Z',
+      durationMinutes: 120,
       location: { kind: 'new', address: 'US2 replacement host location' },
     });
 
@@ -391,6 +403,7 @@ describe('US2 hosting sessions with local Supabase', () => {
       groupId: group.id,
       plannedHostMembershipId: memberMembershipId,
       startsAt: '2030-10-01T18:00:00Z',
+      durationMinutes: 120,
       location: { kind: 'new', address: 'US2 concurrent session location' },
     });
 
@@ -399,6 +412,7 @@ describe('US2 hosting sessions with local Supabase', () => {
         expectedSession: session,
         plannedHostMembershipId: memberMembershipId,
         startsAt: '2030-10-02T18:00:00Z',
+        durationMinutes: 120,
         location: { kind: 'existing', locationId: session.location_id },
       }),
       designateActualHost(session, otherMembershipId),

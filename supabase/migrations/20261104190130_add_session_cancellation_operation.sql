@@ -43,6 +43,7 @@ begin
   if not (
     expected_session ?& array[
       'starts_at',
+      'duration_minutes',
       'location_id',
       'planned_host_membership_id',
       'actual_host_membership_id',
@@ -57,6 +58,7 @@ begin
   into expected_state
   from pg_catalog.jsonb_to_record(expected_session) as state(
     starts_at timestamptz,
+    duration_minutes integer,
     location_id uuid,
     planned_host_membership_id uuid,
     actual_host_membership_id uuid,
@@ -88,6 +90,8 @@ begin
 
   if current_session.starts_at
       is distinct from expected_state.starts_at
+    or current_session.duration_minutes
+      is distinct from expected_state.duration_minutes
     or current_session.location_id
       is distinct from expected_state.location_id
     or current_session.planned_host_membership_id

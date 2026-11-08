@@ -253,6 +253,7 @@ describe('US2 memberships and access with local Supabase', () => {
       groupId: group.id,
       plannedHostMembershipId: memberMembershipId,
       startsAt: '2020-02-01T18:00:00Z',
+      durationMinutes: 120,
       location: {
         kind: 'new',
         address: 'US2 rejoining history location',

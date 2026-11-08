@@ -99,6 +99,7 @@ export type Database = {
       sessions: {
         Row: {
           actual_host_membership_id: string | null;
+          duration_minutes: number | null;
           group_id: string;
           id: string;
           location_id: string;
@@ -109,6 +110,7 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           actual_host_membership_id?: string | null;
+          duration_minutes?: number | null;
           group_id: string;
           id?: string;
           location_id: string;
@@ -118,6 +120,7 @@ export type Database = {
         };
         Update: {
           actual_host_membership_id?: string | null;
+          duration_minutes?: number | null;
           group_id?: string;
           id?: string;
           location_id?: string;
@@ -183,6 +186,7 @@ export type Database = {
         Args: { expected_session: Json; position_changes?: Json; target_session_id: string };
         Returns: {
           actual_host_membership_id: string | null;
+          duration_minutes: number | null;
           group_id: string;
           id: string;
           location_id: string;
@@ -201,6 +205,7 @@ export type Database = {
         Args: { expected_session: Json; target_session_id: string };
         Returns: {
           actual_host_membership_id: string | null;
+          duration_minutes: number | null;
           group_id: string;
           id: string;
           location_id: string;
@@ -234,12 +239,14 @@ export type Database = {
           new_location_address?: string;
           planned_host_id: string;
           position_changes?: Json;
+          session_duration_minutes: number;
           session_location_id?: string;
           session_starts_at: string;
           target_group_id: string;
         };
         Returns: {
           actual_host_membership_id: string | null;
+          duration_minutes: number | null;
           group_id: string;
           id: string;
           location_id: string;
@@ -258,6 +265,7 @@ export type Database = {
         Args: { actual_host_id: string; expected_session: Json; target_session_id: string };
         Returns: {
           actual_host_membership_id: string | null;
+          duration_minutes: number | null;
           group_id: string;
           id: string;
           location_id: string;
@@ -337,12 +345,14 @@ export type Database = {
           new_location_address?: string;
           planned_host_id: string;
           position_changes?: Json;
+          session_duration_minutes: number;
           session_location_id?: string;
           session_starts_at: string;
           target_session_id: string;
         };
         Returns: {
           actual_host_membership_id: string | null;
+          duration_minutes: number | null;
           group_id: string;
           id: string;
           location_id: string;

@@ -18,6 +18,7 @@ export async function getSessionsForGroup(groupId: string): Promise<SessionWithL
       group_id,
       location_id,
       starts_at,
+      duration_minutes,
       planned_host_membership_id,
       actual_host_membership_id,
       status,
@@ -41,6 +42,7 @@ export type CreateSessionInput = {
   groupId: string;
   plannedHostMembershipId: string;
   startsAt: string;
+  durationMinutes: number;
   location: SessionLocationInput;
   positionChanges?: readonly HostPositionChange[];
 };
@@ -49,6 +51,7 @@ export type UpdateSessionInput = {
   expectedSession: Session;
   plannedHostMembershipId: string;
   startsAt: string;
+  durationMinutes: number;
   location: SessionLocationInput;
   positionChanges?: readonly HostPositionChange[];
 };
@@ -66,6 +69,7 @@ function toSessionLocationArgs(
 function toSessionStateJson(session: Session): Json {
   return {
     starts_at: session.starts_at,
+    duration_minutes: session.duration_minutes,
     location_id: session.location_id,
     planned_host_membership_id: session.planned_host_membership_id,
     actual_host_membership_id: session.actual_host_membership_id,
@@ -78,6 +82,7 @@ export async function createSession(input: CreateSessionInput): Promise<Session>
     target_group_id: input.groupId,
     planned_host_id: input.plannedHostMembershipId,
     session_starts_at: input.startsAt,
+    session_duration_minutes: input.durationMinutes,
     ...toSessionLocationArgs(input.location),
     position_changes: toHostPositionChangesJson(input.positionChanges ?? []),
   });
@@ -99,6 +104,7 @@ export async function updateSession(input: UpdateSessionInput): Promise<Session>
     expected_session: toSessionStateJson(input.expectedSession),
     planned_host_id: input.plannedHostMembershipId,
     session_starts_at: input.startsAt,
+    session_duration_minutes: input.durationMinutes,
     ...toSessionLocationArgs(input.location),
     position_changes: toHostPositionChangesJson(input.positionChanges ?? []),
   });

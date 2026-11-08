@@ -63,7 +63,7 @@ Format: Datum, Entscheidung, Begründung, Alternativen, wer.
   Für die Benutzeridentität genügt vorerst `auth.users`.
 - **Begründung:** Ein kleiner Umsetzungsschritt erleichtert Entwicklung und Review.
   `profiles` und weitere Attribute des Gesamtentwurfs bleiben zurückgestellt und werden bei fachlichem Bedarf durch spätere Migrationen ergänzt.
-- **Wer:** Mohammad (Model).
+- **Wer:** Mohammad.
 
 ### E-008 · 2026-11-03 · Geschützte Lesezugriffe für User Story 1
 
@@ -74,4 +74,43 @@ Format: Datum, Entscheidung, Begründung, Alternativen, wer.
 - **Begründung:** Die Lesezugriffe benötigen eine verifizierte Benutzeridentität.
   Abfragefilter allein ersetzen keine Berechtigungsprüfung.
 - **Alternative:** RLS bis nach weiteren User Stories verschieben.
-- **Wer:** Mohammad (Model).
+- **Wer:** Mohammad.
+
+### E-009 · 2026-11-04 · Hosting-Reihenfolge und historische Mitgliedschaften
+
+- **Entscheidung:** Die Reihenfolge liegt in `memberships.host_position`.
+  Positionen sind positiv und pro Gruppe eindeutig; `NULL` und Lücken sind erlaubt.
+  Beim Wiedereintritt bleibt dieselbe Mitgliedschaft erhalten, mit neuer
+  Beitrittszeit und ohne frühere Position.
+- **Begründung:** Eine gemeinsame Datenbasis erhält historische Hostreferenzen.
+- **Alternative:** Zusätzliche Reihenfolge als Array oder JSON.
+- **Wer:** Mohammad.
+
+### E-010 · 2026-11-04 · Administration und Berechtigungen
+
+- **Entscheidung:** Der Gruppenersteller wird Administrator und verwaltet
+  Reihenfolge und Sessions. Aktuelle Mitglieder lesen die Gruppendaten und
+  ändern ihre eigene Hosting-Bereitschaft. Der administrativ benannte
+  tatsächliche Host bestätigt die Session, sonst der geplante Host.
+- **Nachfolge:** Ältestes verbleibendes Mitglied nach aktueller Mitgliedschaftsperiode;
+  Auswahl im Controller. Freiwilliger Transfer bleibt zurückgestellt.
+- **Wer:** Mohammad, mit Zustimmung des Teams.
+
+### E-011 · 2026-11-04 · Geschützte Speicherung und Zustandskonflikte
+
+- **Entscheidung:** Änderungen erfolgen über berechtigungsgeprüfte RPCs.
+  Zusammengehörige Änderungen werden atomar gespeichert.
+  Veraltete Erwartungswerte liefern `PT409`.
+- **Begründung:** Sichere Speicherung und erkennbare Konflikte;
+  Rotations- und Auswahlverfahren bleiben im Controller.
+- **Wer:** Mohammad.
+
+### E-012 · 2026-11-04 · Aufnahme ohne zusätzlichen Beitrittsworkflow
+
+- **Entscheidung:** Der Administrator nimmt Nutzer auf und reaktiviert
+  Mitgliedschaften. Ein zusätzlicher Beitrittsworkflow gehört nicht zum
+  ursprünglich festgelegten Story-Umfang.
+- **Alternative:** Beitrittsanfragen mit Freigabe als eigene User Story.
+- **Wer:** Team bei der ursprünglichen Festlegung der User Stories.
+
+Details: [Datenmodell](datenmodell.md) und [Model-API](model-api.md).
