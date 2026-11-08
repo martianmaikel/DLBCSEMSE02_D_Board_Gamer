@@ -317,20 +317,9 @@ export type Database = {
           target_group_id: string;
         };
         Returns: {
-          group_id: string;
-          host_position: number | null;
-          id: string;
-          is_active: boolean;
-          joined_at: string | null;
-          user_id: string;
-          willing_to_host: boolean;
-        };
-        SetofOptions: {
-          from: '*';
-          to: 'memberships';
-          isOneToOne: true;
-          isSetofReturn: false;
-        };
+          group_deleted: boolean;
+          membership: Database['public']['Tables']['memberships']['Row'];
+        }[];
       };
       save_host_positions: {
         Args: { position_changes: Json; target_group_id: string };

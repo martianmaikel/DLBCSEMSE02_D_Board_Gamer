@@ -22,6 +22,7 @@ export type {
   HostPositionChange,
   HostingWillingnessInput,
   LeaveGroupInput,
+  LeaveGroupResult,
   Membership,
 } from './memberships';
 

@@ -13,6 +13,10 @@ import {
   confirmSession,
   createSession,
   getSessionsForGroup,
+  cancelSession,
+  saveOwnProfile,
+  type LeaveGroupResult,
+  type Membership,
 } from './index';
 import { supabase } from './supabase';
 import { createUs2Fixtures, type TestAccount } from './test-support/us2-fixtures';
@@ -39,6 +43,14 @@ let owner: TestAccount;
 let member: TestAccount;
 let otherMember: TestAccount;
 let outsider: TestAccount;
+
+function expectRetainedMembership(result: LeaveGroupResult): Membership {
+  expect(result.groupDeleted).toBe(false);
+  if (result.groupDeleted) {
+    throw new Error('Expected an ordinary departure, not group deletion');
+  }
+  return result.membership;
+}
 
 describe('US2 memberships and access with local Supabase', () => {
   beforeAll(async () => {
@@ -185,12 +197,14 @@ describe('US2 memberships and access with local Supabase', () => {
 
     await signIn(member.email, member.password);
 
-    const departed = await leaveGroup({
-      groupId: group.id,
-      expectedJoinedAt: departingMember.joined_at,
-      expectedAdminMembershipId: group.admin_membership_id,
-      successorMembershipId: null,
-    });
+    const departed = expectRetainedMembership(
+      await leaveGroup({
+        groupId: group.id,
+        expectedJoinedAt: departingMember.joined_at,
+        expectedAdminMembershipId: group.admin_membership_id,
+        successorMembershipId: null,
+      }),
+    );
 
     expect(departed).toEqual({
       ...departingMember,
@@ -263,12 +277,14 @@ describe('US2 memberships and access with local Supabase', () => {
     await signIn(member.email, member.password);
     const completedSession = await confirmSession(session);
 
-    const departed = await leaveGroup({
-      groupId: group.id,
-      expectedJoinedAt: originalMembership.joined_at,
-      expectedAdminMembershipId: group.admin_membership_id,
-      successorMembershipId: null,
-    });
+    const departed = expectRetainedMembership(
+      await leaveGroup({
+        groupId: group.id,
+        expectedJoinedAt: originalMembership.joined_at,
+        expectedAdminMembershipId: group.admin_membership_id,
+        successorMembershipId: null,
+      }),
+    );
 
     await signIn(owner.email, owner.password);
 
@@ -330,12 +346,14 @@ describe('US2 memberships and access with local Supabase', () => {
       throw new Error('Succession fixture has no administrator membership');
     }
 
-    const departed = await leaveGroup({
-      groupId: group.id,
-      expectedJoinedAt: departingAdmin.joined_at,
-      expectedAdminMembershipId: ownerMembershipId,
-      successorMembershipId: memberMembershipId,
-    });
+    const departed = expectRetainedMembership(
+      await leaveGroup({
+        groupId: group.id,
+        expectedJoinedAt: departingAdmin.joined_at,
+        expectedAdminMembershipId: ownerMembershipId,
+        successorMembershipId: memberMembershipId,
+      }),
+    );
 
     expect(departed).toEqual({
       ...departingAdmin,
@@ -438,57 +456,256 @@ describe('US2 memberships and access with local Supabase', () => {
       );
     }
   });
-  it('clears administration when the last member leaves and retains historical rows', async () => {
-    const { group, creator } = await createOwnedGroup();
+  it('deletes the last active member group and its history but preserves accounts, profiles and other groups', async () => {
+    const profiles = [];
+    for (const account of [owner, member, otherMember, outsider]) {
+      await signIn(account.email, account.password);
+      profiles.push(await saveOwnProfile(`Departure-${account.id}`));
+    }
 
-    const departed = await leaveGroup({
+    const foreign = await createHostingGroup();
+    await createSession({
+      groupId: foreign.group.id,
+      plannedHostMembershipId: foreign.ownerMembershipId,
+      startsAt: '2020-02-01T18:00:00Z',
+      durationMinutes: 120,
+      location: { kind: 'new', address: 'Preserved other group location' },
+    });
+    const foreignMembers = await getMembersForGroupIncludingInactive(foreign.group.id);
+    const foreignSessions = await getSessionsForGroup(foreign.group.id);
+    const foreignLocations = await fixtureAdmin
+      .from('locations')
+      .select('*')
+      .eq('group_id', foreign.group.id);
+    expect(foreignLocations.error).toBeNull();
+
+    const { group, ownerMembershipId, memberMembershipId, otherMembershipId } =
+      await createHostingGroup();
+    const memberships = await getActiveMembersForGroup(group.id);
+    const administrator = memberships.find((membership) => membership.id === ownerMembershipId);
+    if (!administrator) {
+      throw new Error('Deletion fixture has no administrator membership');
+    }
+
+    const completed = await createSession({
+      groupId: group.id,
+      plannedHostMembershipId: ownerMembershipId,
+      startsAt: '2020-02-01T18:00:00Z',
+      durationMinutes: 120,
+      location: { kind: 'new', address: 'Deleted completed session location' },
+    });
+    await confirmSession(completed);
+    const cancelled = await createSession({
+      groupId: group.id,
+      plannedHostMembershipId: memberMembershipId,
+      startsAt: '2099-02-01T18:00:00Z',
+      durationMinutes: 120,
+      location: { kind: 'new', address: 'Deleted cancelled session location' },
+    });
+    await cancelSession(cancelled);
+    await createSession({
+      groupId: group.id,
+      plannedHostMembershipId: otherMembershipId,
+      startsAt: '2099-03-01T18:00:00Z',
+      durationMinutes: 120,
+      location: { kind: 'new', address: 'Deleted scheduled session location' },
+    });
+    const unusedLocation = await fixtureAdmin.from('locations').insert({
+      group_id: group.id,
+      address: 'Deleted location without a session',
+    });
+    expect(unusedLocation.error).toBeNull();
+
+    for (const account of [member, otherMember]) {
+      const membership = memberships.find((row) => row.user_id === account.id);
+      if (!membership) {
+        throw new Error('Deletion fixture has no departing membership');
+      }
+      await signIn(account.email, account.password);
+      expectRetainedMembership(
+        await leaveGroup({
+          groupId: group.id,
+          expectedJoinedAt: membership.joined_at,
+          expectedAdminMembershipId: ownerMembershipId,
+          successorMembershipId: null,
+        }),
+      );
+    }
+
+    await signIn(owner.email, owner.password);
+    expect(await getMembersForGroupIncludingInactive(group.id)).toHaveLength(3);
+    expect(await getActiveMembersForGroup(group.id)).toEqual([administrator]);
+    expect(await getSessionsForGroup(group.id)).toHaveLength(3);
+
+    const input = {
+      groupId: group.id,
+      expectedJoinedAt: administrator.joined_at,
+      expectedAdminMembershipId: ownerMembershipId,
+      successorMembershipId: null,
+    };
+    await expect(leaveGroup(input)).resolves.toEqual({ groupDeleted: true, membership: null });
+
+    // Service-role reads distinguish actual deletion from revoked RLS visibility.
+    const deletedGroup = await fixtureAdmin.from('groups').select('*').eq('id', group.id);
+    expect(deletedGroup.error).toBeNull();
+    expect(deletedGroup.data).toEqual([]);
+    for (const table of ['sessions', 'locations', 'memberships'] as const) {
+      const result = await fixtureAdmin.from(table).select('*').eq('group_id', group.id);
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual([]);
+    }
+
+    for (const account of [owner, member, otherMember, outsider]) {
+      const result = await fixtureAdmin.auth.admin.getUserById(account.id);
+      expect(result.error).toBeNull();
+      expect(result.data.user?.id).toBe(account.id);
+    }
+    const preservedProfiles = await fixtureAdmin
+      .from('profiles')
+      .select('*')
+      .in(
+        'id',
+        profiles.map((profile) => profile.id),
+      );
+    expect(preservedProfiles.error).toBeNull();
+    expect(preservedProfiles.data).toHaveLength(profiles.length);
+    expect(preservedProfiles.data).toEqual(expect.arrayContaining(profiles));
+    await expect(getGroupsForUser(owner.id)).resolves.toContainEqual(foreign.group);
+    await expect(getGroupsForUser(owner.id)).resolves.not.toContainEqual(group);
+    await expect(getMembersForGroupIncludingInactive(foreign.group.id)).resolves.toEqual(
+      foreignMembers,
+    );
+    await expect(getSessionsForGroup(foreign.group.id)).resolves.toEqual(foreignSessions);
+    const preservedLocations = await fixtureAdmin
+      .from('locations')
+      .select('*')
+      .eq('group_id', foreign.group.id);
+    expect(preservedLocations.error).toBeNull();
+    expect(preservedLocations.data).toEqual(foreignLocations.data);
+    await expect(leaveGroup(input)).rejects.toMatchObject({ code: '42501' });
+  });
+
+  it('rejects stale last-departure snapshots before deleting any group data', async () => {
+    const { group, creator } = await createOwnedGroup();
+    await setHostingWillingness({
+      groupId: group.id,
+      expectedWillingness: false,
+      newWillingness: true,
+    });
+    await createSession({
+      groupId: group.id,
+      plannedHostMembershipId: creator.id,
+      startsAt: '2099-02-01T18:00:00Z',
+      durationMinutes: 120,
+      location: { kind: 'new', address: 'Preserved after stale last departure' },
+    });
+    const membersBefore = await getActiveMembersForGroup(group.id);
+    const sessionsBefore = await getSessionsForGroup(group.id);
+    const locationsBefore = await fixtureAdmin
+      .from('locations')
+      .select('*')
+      .eq('group_id', group.id);
+    expect(locationsBefore.error).toBeNull();
+    for (const snapshot of [
+      { expectedJoinedAt: '2000-01-01T00:00:00Z', expectedAdminMembershipId: creator.id },
+      { expectedJoinedAt: creator.joined_at, expectedAdminMembershipId: outsider.id },
+    ]) {
+      await expect(
+        leaveGroup({ groupId: group.id, successorMembershipId: null, ...snapshot }),
+      ).rejects.toMatchObject({ code: 'PT409' });
+      await expect(getGroupsForUser(owner.id)).resolves.toContainEqual(group);
+      await expect(getActiveMembersForGroup(group.id)).resolves.toEqual(membersBefore);
+      await expect(getSessionsForGroup(group.id)).resolves.toEqual(sessionsBefore);
+      const locations = await fixtureAdmin.from('locations').select('*').eq('group_id', group.id);
+      expect(locations.error).toBeNull();
+      expect(locations.data).toEqual(locationsBefore.data);
+    }
+
+    await signIn(outsider.email, outsider.password);
+    await expect(
+      leaveGroup({
+        groupId: group.id,
+        expectedJoinedAt: creator.joined_at,
+        expectedAdminMembershipId: creator.id,
+        successorMembershipId: null,
+      }),
+    ).rejects.toMatchObject({ code: '42501' });
+    const anonymous = await anonymousClient.rpc('leave_group', {
+      target_group_id: group.id,
+      expected_joined_at: creator.joined_at ?? '',
+      expected_admin_id: creator.id,
+    });
+    expect(anonymous.error?.code).toBe('42501');
+    await signIn(owner.email, owner.password);
+    await expect(getActiveMembersForGroup(group.id)).resolves.toEqual(membersBefore);
+    await expect(getSessionsForGroup(group.id)).resolves.toEqual(sessionsBefore);
+  });
+  it('rejects a stale administrator snapshot when the successor is now the last active member', async () => {
+    const { group, creator } = await createOwnedGroup();
+    const successor = await admitGroupMember({
+      groupId: group.id,
+      userId: member.id,
+      expectedMembership: null,
+    });
+    const departed = expectRetainedMembership(
+      await leaveGroup({
+        groupId: group.id,
+        expectedJoinedAt: creator.joined_at,
+        expectedAdminMembershipId: creator.id,
+        successorMembershipId: successor.id,
+      }),
+    );
+    await signIn(member.email, member.password);
+    const input = {
+      groupId: group.id,
+      expectedJoinedAt: successor.joined_at,
+      expectedAdminMembershipId: creator.id,
+      successorMembershipId: null,
+    };
+    await expect(leaveGroup(input)).rejects.toMatchObject({ code: 'PT409' });
+    await expect(getGroupsForUser(member.id)).resolves.toContainEqual({
+      ...group,
+      admin_membership_id: successor.id,
+    });
+    await expect(getActiveMembersForGroup(group.id)).resolves.toEqual([successor]);
+    await expect(getMembersForGroupIncludingInactive(group.id)).resolves.toEqual(
+      expect.arrayContaining([departed, successor]),
+    );
+    await expect(
+      leaveGroup({ ...input, expectedAdminMembershipId: successor.id }),
+    ).resolves.toEqual({
+      groupDeleted: true,
+      membership: null,
+    });
+  });
+
+  it('serializes competing last-departure calls and deletes the group only once', async () => {
+    const { group, creator } = await createOwnedGroup();
+    const input = {
       groupId: group.id,
       expectedJoinedAt: creator.joined_at,
       expectedAdminMembershipId: creator.id,
       successorMembershipId: null,
-    });
-
-    expect(departed).toEqual({
-      ...creator,
-      is_active: false,
-      host_position: null,
-    });
-
-    // Inspect retained rows independently of the former member's access.
-    const storedGroup = await fixtureAdmin.from('groups').select('*').eq('id', group.id).single();
-
+    };
+    const results = await Promise.allSettled([leaveGroup(input), leaveGroup(input)]);
+    const successes = results.filter((result) => result.status === 'fulfilled');
+    const failures = results.filter((result) => result.status === 'rejected');
+    expect(successes).toEqual([
+      { status: 'fulfilled', value: { groupDeleted: true, membership: null } },
+    ]);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].reason).toMatchObject({ code: '42501' });
+    const storedGroup = await fixtureAdmin.from('groups').select('*').eq('id', group.id);
     expect(storedGroup.error).toBeNull();
-    expect(storedGroup.data).toEqual({
-      ...group,
-      admin_membership_id: null,
-    });
-
-    const storedMembership = await fixtureAdmin
+    expect(storedGroup.data).toEqual([]);
+    const storedMemberships = await fixtureAdmin
       .from('memberships')
       .select('*')
-      .eq('group_id', group.id)
-      .single();
-
-    expect(storedMembership.error).toBeNull();
-    expect(storedMembership.data).toEqual(departed);
-
-    const visibleGroups = await getGroupsForUser(owner.id);
-
-    expect(visibleGroups.map((visibleGroup) => visibleGroup.id)).not.toContain(group.id);
-
-    const directRead = await supabase.from('groups').select('*').eq('id', group.id);
-
-    expect(directRead.error).toBeNull();
-    expect(directRead.data).toEqual([]);
-
-    await expect(
-      admitGroupMember({
-        groupId: group.id,
-        userId: owner.id,
-        expectedMembership: departed,
-      }),
-    ).rejects.toMatchObject({ code: '42501' });
+      .eq('group_id', group.id);
+    expect(storedMemberships.error).toBeNull();
+    expect(storedMemberships.data).toEqual([]);
   });
+
   it('limits admission and reactivation to the group administrator', async () => {
     const { group, otherMembershipId } = await createHostingGroup();
     const members = await getActiveMembersForGroup(group.id);
@@ -500,12 +717,14 @@ describe('US2 memberships and access with local Supabase', () => {
 
     await signIn(otherMember.email, otherMember.password);
 
-    const departed = await leaveGroup({
-      groupId: group.id,
-      expectedJoinedAt: leavingMember.joined_at,
-      expectedAdminMembershipId: group.admin_membership_id,
-      successorMembershipId: null,
-    });
+    const departed = expectRetainedMembership(
+      await leaveGroup({
+        groupId: group.id,
+        expectedJoinedAt: leavingMember.joined_at,
+        expectedAdminMembershipId: group.admin_membership_id,
+        successorMembershipId: null,
+      }),
+    );
 
     await signIn(member.email, member.password);
     const membershipsBefore = await getMembersForGroupIncludingInactive(group.id);

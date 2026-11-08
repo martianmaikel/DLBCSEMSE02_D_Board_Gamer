@@ -174,6 +174,7 @@ describe('Profiles and legacy accounts with local Supabase', () => {
       expectedAdminMembershipId: creator.id,
       successorMembershipId: null,
     });
+    expect(inactive.groupDeleted).toBe(false);
     await expect(getOwnProfile()).resolves.toEqual(memberProfile);
     await expect(getActiveMemberProfilesForGroup(group.id)).resolves.toEqual([]);
     const hiddenOwner = await supabase.from('profiles').select('*').eq('id', accounts.owner.id);
@@ -188,7 +189,7 @@ describe('Profiles and legacy accounts with local Supabase', () => {
     await admitGroupMember({
       groupId: group.id,
       userId: accounts.member.id,
-      expectedMembership: inactive,
+      expectedMembership: inactive.membership,
     });
     expect(await getActiveMemberProfilesForGroup(group.id)).toHaveLength(2);
     await leaveGroup({

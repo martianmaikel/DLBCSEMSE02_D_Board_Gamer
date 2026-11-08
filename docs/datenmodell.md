@@ -1,13 +1,10 @@
-# Datenmodell – User Story 1 und 2 und gemeinsame Grundlagen
+# Datenmodell – US1, US2 und gemeinsame Grundlagen
 
-Stand: 08.11.2026. Die US2-Erweiterungen sind auf dem Feature-Branch lokal
-implementiert und getestet. Profile ergänzen die gemeinsame technische Grundlage;
-sie sind keine Anforderung aus US2. Die US2- und Profil-Migrationen wurden in
-diesem Arbeitsstand nur lokal angewendet.
+Stand: 08.11.2026. Die US2-Erweiterungen und die Profilfunktionen wurden lokal
+implementiert und geprüft. Profile bilden eine gemeinsame technische Grundlage.
 
 Maßgeblich sind die [SQL-Migrationen](../supabase/migrations/).
-`auth.users` gehört zu Supabase Auth und wird nicht durch unsere Migrationen
-angelegt.
+`auth.users` wird von Supabase Auth verwaltet.
 
 ## Tabellen und Beziehungen
 
@@ -66,9 +63,9 @@ erDiagram
     }
 ```
 
-`PK` = Primärschlüssel, `FK` = Fremdschlüssel. `||` bedeutet genau einen,
-`|o` beziehungsweise `o|` null oder einen und `o{` null bis beliebig viele
-Datensätze.
+`PK` = Primärschlüssel, `FK` = Fremdschlüssel. `||` bedeutet genau einen
+Datensatz, `|o` beziehungsweise `o|` null oder einen und `o{` null bis
+beliebig viele.
 
 `session_status` enthält `scheduled`, `completed` und `cancelled`.
 Ein vergangener Termin allein ändert den Status nicht.
@@ -82,76 +79,72 @@ sein Profil mitgelöscht. Mitgliedschaften referenzieren `auth.users`.
 Die Registrierung verlangt Benutzername, E-Mail und Passwort. Ein Trigger
 auf `auth.users` legt das Profil in derselben Transaktion wie das Konto an.
 Beim Anlegen und Ändern des Profils wird äußerer Leerraum entfernt. Der
-Benutzername muss danach nicht leer sein. Ein eindeutiger Index auf
-`lower(username)` sichert die Eindeutigkeit unabhängig von Groß- und
-Kleinschreibung. Schlägt die Profilanlage fehl, wird die Registrierung
+Benutzername muss danach mindestens ein Zeichen enthalten. Ein eindeutiger
+Index auf `lower(username)` sichert die Eindeutigkeit unabhängig von Groß-
+und Kleinschreibung. Schlägt die Profilanlage fehl, wird die Registrierung
 zurückgerollt.
 
-Bestehende Konten ohne Profil bleiben nutzbar. Ihre Inhaber können ein
-Profil über `save_own_profile` anlegen und später ändern. Die Funktion
-ermittelt die Nutzer-ID aus der angemeldeten Sitzung und erlaubt Änderungen
-ausschließlich am eigenen Profil.
+Bestehende Konten ohne Profil bleiben nutzbar. Ihre Inhaber können ihr
+Profil über `save_own_profile` anlegen und ändern. Die Funktion ermittelt
+die Nutzer-ID aus der angemeldeten Sitzung.
 
 Angemeldete Nutzer dürfen ihr eigenes Profil lesen. Andere Profile sind
 sichtbar, wenn beide Nutzer aktive Mitgliedschaften in mindestens einer
-gemeinsamen Gruppe haben. Direkte Tabellenänderungen aus der App und
-anonyme Zugriffe sind gesperrt.
+gemeinsamen Gruppe haben.
 
 ## Session-Dauer
 
 `sessions.duration_minutes` ist eine Ganzzahl ohne Standardwert.
 Gesetzte Werte liegen einschließlich der Grenzen zwischen 30 und 1440 Minuten.
-Bestehende Sessions dürfen `NULL` behalten; eine unbekannte Dauer wird nicht
-nachträglich geschätzt.
+Bestehende Sessions dürfen `NULL` behalten.
 
 Die geschützten Operationen `create_session` und `update_session` verlangen
-`session_duration_minutes` mit einem gültigen Wert. Auch beim Bearbeiten einer
-alten Session muss die Dauer angegeben werden. Dauer, Session-Daten und optionale
-Orts- und Positionsänderungen werden innerhalb derselben Transaktion gespeichert.
+eine gültige Dauer. Das gilt auch beim Bearbeiten einer alten Session.
+Dauer, Session-Daten und optionale Orts- und Positionsänderungen werden
+gemeinsam gespeichert.
 
-Der erwartete Session-Zustand enthält `duration_minutes`, bei Altdaten auch
-`null`. Bearbeiten, Absagen, Benennen des tatsächlichen Hosts und Bestätigen
-vergleichen dieses Feld mit dem gespeicherten Wert. Schon eine konkurrierende
-Änderung allein an der Dauer führt bei einem veralteten Snapshot zu `PT409`.
+Der erwartete Session-Zustand enthält `duration_minutes`, bei Altdaten
+auch `null`. Eine konkurrierende Änderung allein an der Dauer führt bei
+einem veralteten Snapshot zu `PT409`.
 
 ## Mitgliedschaft und Hosting-Reihenfolge
 
 - Eine aktuelle Mitgliedschaft erfordert die passende Gruppe und Nutzer-ID
-  sowie `is_active = true`. Das Vorhandensein eines Mitgliedschaftsdatensatzes
-  allein genügt nicht.
-- Beim Austritt bleibt derselbe Datensatz mit `is_active = false` erhalten.
-  Sein `host_position` wird geleert; historische Hostreferenzen bleiben gültig.
-- Beim Wiedereintritt wird derselbe Datensatz reaktiviert. `joined_at` wird auf
-  den Beginn der neuen ununterbrochenen Mitgliedschaft gesetzt.
-  Die bisherige Hosting-Bereitschaft bleibt erhalten; die frühere Position
-  wird nicht wiederhergestellt.
+  sowie `is_active = true`.
+- Beim Austritt bleibt derselbe Datensatz mit `is_active = false` erhalten,
+  solange weitere aktive Mitglieder bleiben. Sein `host_position` wird
+  geleert. Historische Hostreferenzen bleiben gültig.
+- Beim Wiedereintritt in eine bestehende Gruppe wird derselbe Datensatz
+  reaktiviert. `joined_at` bezeichnet dann den Beginn der neuen
+  ununterbrochenen Mitgliedschaft. Die bisherige Hosting-Bereitschaft
+  bleibt erhalten, die frühere Position wird nicht wiederhergestellt.
 - `host_position` speichert die Reihenfolge innerhalb einer Gruppe.
   Eine gesetzte Position ist positiv, innerhalb der Gruppe eindeutig und
   nur für aktive, hostingbereite Mitglieder zulässig.
 - `NULL` bedeutet keine zugewiesene Position. Lücken sind erlaubt.
   Verschiedene Gruppen dürfen dieselben Positionsnummern verwenden.
-- Die Eindeutigkeit ist aufschiebbar, damit Positionen innerhalb einer
-  geschützten Speicheroperation atomar getauscht werden können.
+- Die Eindeutigkeitsprüfung ist aufschiebbar, damit Positionen atomar
+  getauscht werden können.
 
 ## Administration und Sessions
 
 - Die geschützte Gruppenerstellung speichert Gruppe, aktive Mitgliedschaft
   des Erstellers und Administratorreferenz gemeinsam.
-- Beim Austritt des Administrators speichert die Austrittsoperation einen
-  ausdrücklich übergebenen, anderen aktiven Nachfolger derselben Gruppe.
-  Solange weitere aktive Mitglieder vorhanden sind, ist ein Nachfolger nötig.
-- Verlässt das letzte Mitglied die Gruppe, wird `admin_membership_id` auf
-  `NULL` gesetzt. Gruppe und historische Mitgliedschaft bleiben erhalten.
+- Beim Austritt des Administrators ist ein aktiver Nachfolger derselben
+  Gruppe erforderlich, solange weitere aktive Mitglieder bleiben. Der
+  Controller wählt den Nachfolger aus, die Austrittsoperation speichert ihn.
+- Beim Austritt des letzten aktiven Mitglieds werden die Gruppe, ihre Sessions,
+  Orte und alle Mitgliedschaften einschließlich inaktiver Mitgliedschaften in
+  einer Transaktion gelöscht. Auth-Accounts, Profile und andere Gruppen bleiben
+  erhalten.
 - Ein Wiedereintritt stellt eine frühere Administratorrolle nicht wieder her.
-- Geplanter und tatsächlicher Host werden getrennt gespeichert.
-  Eine Session mit `status = completed` benötigt einen tatsächlichen Host.
-- Die geschützte Bestätigung speichert tatsächlichen Host und Abschlussstatus
-  gemeinsam und erhält den geplanten Host.
+- Geplanter und tatsächlicher Host werden getrennt gespeichert. Die geschützte
+  Bestätigung speichert den tatsächlichen Host und `completed` gemeinsam.
+  Der geplante Host bleibt erhalten.
 
 Hostauswahl, Rotationsfortschritt, Buchungs- und Stornierungsverarbeitung,
-Tauschlogik sowie die Auswahl des ältesten verbleibenden Mitglieds als
-Nachfolger gehören zum Controller. Die Datenbank prüft Berechtigungen und
-Integrität und speichert zusammengehörige Änderungen atomar.
+Tauschlogik und Nachfolgeauswahl gehören zum Controller. Die Datenbank prüft
+Berechtigungen und Integrität und speichert zusammengehörige Änderungen atomar.
 
 ## Integrität und Übergangsdaten
 
@@ -161,47 +154,26 @@ Integrität und speichert zusammengehörige Änderungen atomar.
   Grundlage sind eindeutige Kombinationen aus `group_id` und `id`
   in `memberships` beziehungsweise `locations`.
 
-| Feld                                  | Bedeutung von `NULL`                                                                         |
-| ------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `groups.admin_membership_id`          | Bestehende Testgruppe ohne initialisierte Administration oder Gruppe ohne aktive Mitglieder. |
-| `memberships.host_position`           | Keine zugewiesene Hosting-Position.                                                          |
-| `memberships.joined_at`               | Nur bestehende Legacy-Testdaten ohne bekannten Beginn.                                       |
-| `sessions.planned_host_membership_id` | Nur bestehende Legacy-Testdaten ohne geplanten Host.                                         |
-| `sessions.actual_host_membership_id`  | Noch kein tatsächlicher Host festgelegt; bei `completed` unzulässig.                         |
-| `sessions.duration_minutes`           | Unbekannte Dauer einer alten Session; beim Erstellen und Bearbeiten per RPC unzulässig.      |
+| Feld                                  | Bedeutung von `NULL`                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------- |
+| `groups.admin_membership_id`          | Bestehende Testgruppe ohne initialisierte Administration.                     |
+| `memberships.host_position`           | Keine zugewiesene Hosting-Position.                                           |
+| `memberships.joined_at`               | Bestehende Legacy-Testdaten ohne bekannten Beginn.                            |
+| `sessions.planned_host_membership_id` | Bestehende Legacy-Testdaten ohne geplanten Host.                              |
+| `sessions.actual_host_membership_id`  | Noch kein tatsächlicher Host festgelegt. Bei `completed` ist er erforderlich. |
+| `sessions.duration_minutes`           | Unbekannte Dauer einer alten Session.                                         |
 
-Die erforderlichen Werte für `joined_at` und `planned_host_membership_id`
-werden durch `CHECK ... NOT VALID` abgesichert. Bestehende Legacy-Zeilen
-können zunächst `NULL` behalten; neue und aktualisierte Zeilen müssen
-die Prüfungen erfüllen. Alte Beitrittszeiten werden nicht erfunden.
+`CHECK ... NOT VALID` erlaubt bestehende Legacy-Zeilen ohne `joined_at`
+beziehungsweise geplanten Host. Neue und aktualisierte Zeilen müssen die
+jeweilige Prüfung erfüllen.
 
 ## Datenzugriff
 
-- `getGroupsForUser(userId)` liefert Gruppen über aktive Mitgliedschaften
-  des angegebenen Nutzers innerhalb der RLS-Berechtigungen des Aufrufers.
-- `getActiveMembersForGroup(groupId)` liefert aktuelle Mitglieder mit
-  Hosting-Bereitschaft und Position.
-- `getMembersForGroupIncludingInactive(groupId)` liefert auch die erhaltenen
-  Mitgliedschaften ehemaliger Mitglieder.
-- `isActiveGroupMember(groupId, userId)` prüft eine aktuelle Mitgliedschaft.
-- `getSessionsForGroup(groupId)` liefert Sessions aller Status mit Ort,
-  aufsteigend nach `starts_at`. Der Controller bestimmt die nächste Session.
-- `signIn(email, password)` meldet einen bestehenden Account an.
-- `signUp({ username, email, password })` registriert einen Account samt Profil;
-  das Ergebnis unterscheidet sofortige Anmeldung und ausstehende E-Mail-Bestätigung.
-- `getOwnProfile()` liest das eigene Profil oder liefert `null`.
-- `saveOwnProfile(username)` legt das eigene Profil an oder ändert dessen Namen.
-- `getActiveMemberProfilesForGroup(groupId)` liefert vorhandene Profile aktiver
-  Mitglieder einer eigenen aktiven Gruppe, nach Nutzer-ID sortiert.
+RLS erlaubt angemeldeten aktuellen Mitgliedern den Zugriff auf ihre Gruppe,
+deren Orte, Sessions und Mitgliedschaften. Erhaltene Mitgliedschaften
+ausgetretener Nutzer gewähren keinen weiteren Zugriff. Anonyme Zugriffe
+und direkte Tabellenänderungen aus der App sind gesperrt.
 
-RLS erlaubt angemeldeten aktuellen Mitgliedern die Lesezugriffe auf ihre
-Gruppe, deren Orte, Sessions und sämtliche Mitgliedschaften dieser Gruppe.
-Ausgetretene Mitglieder und nicht angemeldete Clients erhalten keinen Zugriff
-auf diese Gruppendaten.
-
-Direkte `INSERT`-, `UPDATE`- und `DELETE`-Zugriffe aus der App bleiben gesperrt.
-Autorisierte Änderungen erfolgen über geschützte RPC-Operationen, die durch
-die öffentlichen Model-Funktionen aufgerufen werden.
-
-Einzelheiten zu Einrichtung und Model-Schnittstelle stehen in
-[Supabase](supabase.md).
+Die öffentlichen Lese- und Schreiboperationen stehen in der
+[Model-API](model-api.md). Einrichtung und lokale Prüfung sind in
+[Supabase](supabase.md) dokumentiert.

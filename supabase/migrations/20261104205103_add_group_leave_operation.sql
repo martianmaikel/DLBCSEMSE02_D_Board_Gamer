@@ -1,11 +1,11 @@
--- Leave the group and, when necessary, store the supplied successor atomically.
+-- Leave the group atomically, deleting its data on the last active departure.
 create function private.leave_group(
   target_group_id uuid,
   expected_joined_at timestamptz,
   expected_admin_id uuid,
   successor_membership_id uuid default null
 )
-returns public.memberships
+returns table (group_deleted boolean, membership public.memberships)
 language plpgsql
 security definer
 set search_path = ''
@@ -15,6 +15,7 @@ declare
   current_admin_id uuid;
   current_membership public.memberships%rowtype;
   departed_membership public.memberships%rowtype;
+  has_remaining_members boolean;
 begin
   if current_user_id is null then
     raise exception 'Authentication required'
@@ -42,12 +43,12 @@ begin
       using errcode = '42501';
   end if;
 
-  select membership.*
+  select member_row.*
   into current_membership
-  from public.memberships as membership
-  where membership.group_id = target_group_id
-    and membership.user_id = current_user_id
-    and membership.is_active = true
+  from public.memberships as member_row
+  where member_row.group_id = target_group_id
+    and member_row.user_id = current_user_id
+    and member_row.is_active = true
   for update;
 
   if not found then
@@ -63,26 +64,29 @@ begin
       using errcode = '40001';
   end if;
 
+  -- Admission and departure share the group lock; inactive history does not count.
+  select exists (
+    select 1
+    from public.memberships as member_row
+    where member_row.group_id = target_group_id
+      and member_row.is_active = true
+      and member_row.id <> current_membership.id
+  ) into has_remaining_members;
+
   if current_membership.id = current_admin_id then
     if successor_membership_id is null then
-      if exists (
-        select 1
-        from public.memberships as membership
-        where membership.group_id = target_group_id
-          and membership.is_active = true
-          and membership.id <> current_membership.id
-      ) then
+      if has_remaining_members then
         raise exception 'A successor is required while other members remain'
           using errcode = '22023';
       end if;
     else
       if not exists (
         select 1
-        from public.memberships as membership
-        where membership.id = successor_membership_id
-          and membership.group_id = target_group_id
-          and membership.is_active = true
-          and membership.id <> current_membership.id
+        from public.memberships as member_row
+        where member_row.id = successor_membership_id
+          and member_row.group_id = target_group_id
+          and member_row.is_active = true
+          and member_row.id <> current_membership.id
       ) then
         raise exception 'Successor must be another active group member'
           using errcode = '22023';
@@ -97,6 +101,21 @@ begin
       using errcode = '42501';
   end if;
 
+  if not has_remaining_members then
+    -- Break the administrator cycle, then remove referencing rows before their targets.
+    update public.groups
+    set admin_membership_id = null
+    where id = target_group_id;
+
+    delete from public.sessions where group_id = target_group_id;
+    delete from public.locations where group_id = target_group_id;
+    delete from public.memberships where group_id = target_group_id;
+    delete from public.groups where id = target_group_id;
+
+    return query select true, null::public.memberships;
+    return;
+  end if;
+
   update public.memberships
   set
     is_active = false,
@@ -104,7 +123,7 @@ begin
   where id = current_membership.id
   returning * into departed_membership;
 
-  return departed_membership;
+  return query select false, departed_membership;
 end;
 $$;
 
@@ -122,12 +141,12 @@ create function public.leave_group(
   expected_admin_id uuid,
   successor_membership_id uuid default null
 )
-returns public.memberships
+returns table (group_deleted boolean, membership public.memberships)
 language sql
 security invoker
 set search_path = ''
 as $$
-  select private.leave_group(
+  select * from private.leave_group(
     target_group_id,
     expected_joined_at,
     expected_admin_id,
@@ -144,4 +163,4 @@ on function public.leave_group(uuid, timestamptz, uuid, uuid)
 to authenticated;
 
 comment on function public.leave_group(uuid, timestamptz, uuid, uuid) is
-  'Deactivates the caller''s membership and clears its hosting position. A departing administrator must supply a Controller-selected active successor while members remain. Historical references are preserved.';
+  'Deactivates the caller''s membership and preserves history while active members remain, with a Controller-selected administrator successor when needed. The last active departure atomically deletes the group, sessions, locations and all memberships, preserving Auth accounts, profiles and other groups. Returns group_deleted and the retained membership, or NULL after deletion.';

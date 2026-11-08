@@ -123,6 +123,9 @@ export type LeaveGroupInput = {
   successorMembershipId: string | null;
 };
 
+export type LeaveGroupResult =
+  { groupDeleted: false; membership: Membership } | { groupDeleted: true; membership: null };
+
 export async function admitGroupMember(input: AdmitGroupMemberInput): Promise<Membership> {
   const expectedMembership =
     input.expectedMembership === null
@@ -150,19 +153,21 @@ export async function admitGroupMember(input: AdmitGroupMemberInput): Promise<Me
   return data;
 }
 
-export async function leaveGroup(input: LeaveGroupInput): Promise<Membership> {
+export async function leaveGroup(input: LeaveGroupInput): Promise<LeaveGroupResult> {
   if (input.expectedJoinedAt === null || input.expectedAdminMembershipId === null) {
     throw new Error('Membership joining time and group administrator must be known before leaving');
   }
 
-  const { data, error } = await supabase.rpc('leave_group', {
-    target_group_id: input.groupId,
-    expected_joined_at: input.expectedJoinedAt,
-    expected_admin_id: input.expectedAdminMembershipId,
-    ...(input.successorMembershipId === null
-      ? {}
-      : { successor_membership_id: input.successorMembershipId }),
-  });
+  const { data, error } = await supabase
+    .rpc('leave_group', {
+      target_group_id: input.groupId,
+      expected_joined_at: input.expectedJoinedAt,
+      expected_admin_id: input.expectedAdminMembershipId,
+      ...(input.successorMembershipId === null
+        ? {}
+        : { successor_membership_id: input.successorMembershipId }),
+    })
+    .single();
 
   if (error) {
     throw error;
@@ -172,5 +177,13 @@ export async function leaveGroup(input: LeaveGroupInput): Promise<Membership> {
     throw new Error('Group departure returned no data');
   }
 
-  return data;
+  if (data.group_deleted) {
+    return { groupDeleted: true, membership: null };
+  }
+
+  if (data.membership === null) {
+    throw new Error('Group departure returned no membership');
+  }
+
+  return { groupDeleted: false, membership: data.membership };
 }

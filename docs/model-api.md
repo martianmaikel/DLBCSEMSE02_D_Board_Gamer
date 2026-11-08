@@ -114,18 +114,18 @@ dieser Schnittstellenergänzung.
 
 ## Geschützte Schreiboperationen
 
-| Funktion                                                       | Berechtigung und Ergebnis                                                                                                                            |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createGroup(name)`                                            | Angemeldeter Nutzer; erstellt Gruppe, eigene aktive Mitgliedschaft und Administration gemeinsam. Liefert `Group`.                                    |
-| `setHostingWillingness(input)`                                 | Aktuelles Mitglied für die eigene Mitgliedschaft. Liefert `Membership`.                                                                              |
-| `saveHostPositions(groupId, changes)`                          | Gruppenadministrator; speichert vorgegebene Positionen gemeinsam. Liefert die geänderten `Membership[]`.                                             |
-| `admitGroupMember(input)`                                      | Gruppenadministrator; nimmt einen bestehenden Auth-Nutzer auf oder reaktiviert dessen Mitgliedschaft. Liefert `Membership`.                          |
-| `leaveGroup(input)`                                            | Aktuelles Mitglied für den eigenen Austritt; speichert gegebenenfalls die Administrationsnachfolge gemeinsam. Liefert die deaktivierte `Membership`. |
-| `createSession(input)`                                         | Gruppenadministrator; erstellt eine geplante Session. Liefert `Session`.                                                                             |
-| `updateSession(input)`                                         | Gruppenadministrator; bearbeitet eine geplante Session. Liefert `Session`.                                                                           |
-| `cancelSession(expectedSession, positionChanges?)`             | Gruppenadministrator; storniert eine geplante Session. Liefert `Session`.                                                                            |
-| `designateActualHost(expectedSession, actualHostMembershipId)` | Gruppenadministrator; benennt den tatsächlichen Host einer geplanten Session, ohne sie abzuschließen. Liefert `Session`.                             |
-| `confirmSession(expectedSession)`                              | Aktuelles Mitglied, das als tatsächlicher Host benannt ist; ohne Benennung der geplante Host. Liefert die abgeschlossene `Session`.                  |
+| Funktion                                                       | Berechtigung und Ergebnis                                                                                                                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `createGroup(name)`                                            | Angemeldeter Nutzer; erstellt Gruppe, eigene aktive Mitgliedschaft und Administration gemeinsam. Liefert `Group`.                                                                    |
+| `setHostingWillingness(input)`                                 | Aktuelles Mitglied für die eigene Mitgliedschaft. Liefert `Membership`.                                                                                                              |
+| `saveHostPositions(groupId, changes)`                          | Gruppenadministrator; speichert vorgegebene Positionen gemeinsam. Liefert die geänderten `Membership[]`.                                                                             |
+| `admitGroupMember(input)`                                      | Gruppenadministrator; nimmt einen bestehenden Auth-Nutzer auf oder reaktiviert dessen Mitgliedschaft. Liefert `Membership`.                                                          |
+| `leaveGroup(input)`                                            | Aktuelles Mitglied für den eigenen Austritt; speichert gegebenenfalls die Administrationsnachfolge oder löscht die Gruppe beim letzten aktiven Austritt. Liefert `LeaveGroupResult`. |
+| `createSession(input)`                                         | Gruppenadministrator; erstellt eine geplante Session. Liefert `Session`.                                                                                                             |
+| `updateSession(input)`                                         | Gruppenadministrator; bearbeitet eine geplante Session. Liefert `Session`.                                                                                                           |
+| `cancelSession(expectedSession, positionChanges?)`             | Gruppenadministrator; storniert eine geplante Session. Liefert `Session`.                                                                                                            |
+| `designateActualHost(expectedSession, actualHostMembershipId)` | Gruppenadministrator; benennt den tatsächlichen Host einer geplanten Session, ohne sie abzuschließen. Liefert `Session`.                                                             |
+| `confirmSession(expectedSession)`                              | Aktuelles Mitglied, das als tatsächlicher Host benannt ist; ohne Benennung der geplante Host. Liefert die abgeschlossene `Session`.                                                  |
 
 Bearbeiten, Stornieren, Benennen und Bestätigen erfordern `status = scheduled`.
 Ein neuer oder neu zugewiesener geplanter Host muss aktiv und hostingbereit sein.
@@ -185,8 +185,29 @@ Legacy-Daten benötigen daher eine geklärte Datenbasis.
 
 Nur der austretende Administrator darf einen Nachfolger übergeben.
 Solange andere aktive Mitglieder bleiben, muss dieser eine andere aktive
-Mitgliedschaft derselben Gruppe sein. Beim Austritt des letzten Mitglieds
-wird die Administratorreferenz geleert.
+Mitgliedschaft derselben Gruppe sein. Bleiben aktive Mitglieder, wird die eigene
+Mitgliedschaft deaktiviert, ihre Hosting-Position geleert und ihre Historie erhalten.
+
+Beim Austritt des letzten aktiven Mitglieds werden Gruppe, Sessions, Orte und
+alle Mitgliedschaften atomar gelöscht, einschließlich inaktiver Mitgliedschaften.
+Auth-Accounts, Profile und Daten anderer Gruppen bleiben erhalten.
+Die Gruppensperre schützt die Prüfung vor gleichzeitiger Aufnahme oder Austritt.
+Beitrittszeit und Administratorreferenz werden davor geprüft; ein veralteter
+Aufruf liefert `PT409`, ohne Gruppendaten zu löschen.
+
+`leaveGroup` liefert jetzt statt einer einzelnen `Membership` den exportierten
+Typ `LeaveGroupResult`. Die Eingaben bleiben unverändert:
+
+```typescript
+type LeaveGroupResult =
+  { groupDeleted: false; membership: Membership } | { groupDeleted: true; membership: null };
+```
+
+Der Controller unterscheidet beide Fälle über `groupDeleted`. Nur beim gewöhnlichen
+Austritt enthält `membership` den deaktivierten Datensatz, etwa als Snapshot für
+einen späteren Wiedereintritt. Nach Gruppenlöschung existiert kein solcher Datensatz.
+Die RPC `leave_group` liefert genau eine Zeile mit `group_deleted` und `membership`;
+das Model bildet diese auf das Ergebnis oben ab.
 
 Der Controller wählt den vereinbarten Nachfolger aus.
 Der optionale freiwillige Transfer per Anfrage und Annahme ist zurückgestellt.

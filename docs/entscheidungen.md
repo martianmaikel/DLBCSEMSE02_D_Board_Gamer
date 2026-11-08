@@ -129,4 +129,13 @@ Format: Datum, Entscheidung, Begründung, Alternativen, wer.
   Konten ohne Profil bei einem Fehler verworfen.
 - **Wer:** Mohammad.
 
+### E-014 · 2026-11-08 · Gruppenlöschung beim letzten aktiven Austritt
+
+- **Entscheidung:** Beim Austritt des letzten aktiven Mitglieds werden die Gruppe,
+  ihre Sessions, Orte und alle Mitgliedschaften einschließlich inaktiver
+  Mitgliedschaften in einer Transaktion gelöscht. Auth-Accounts, Profile und
+  andere Gruppen bleiben erhalten.
+- **Alternative:** Leere Gruppe mit historischen Daten erhalten.
+- **Wer:** Team.
+
 Details: [Datenmodell](datenmodell.md) und [Model-API](model-api.md).
