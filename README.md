@@ -49,6 +49,8 @@ docs/
   konzept.md         User Stories, Annahmen, offene Punkte
   entscheidungen.md  Entscheidungslog
   ki-einsatz.md      Dokumentation des KI-Einsatzes
+  datenmodell.md     Tabellen, Beziehungen und Integrität
+  model-api.md       Öffentliche Model-Schnittstelle
   supabase.md        Supabase-Einrichtung
 ```
 

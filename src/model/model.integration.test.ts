@@ -44,6 +44,9 @@ jest.mock('./supabase', () => {
 const url = process.env.SUPABASE_TEST_URL;
 const adminKey = process.env.SUPABASE_TEST_SERVICE_ROLE_KEY;
 const publicKey = process.env.SUPABASE_TEST_ANON_KEY;
+const membershipA = randomUUID();
+const membershipB = randomUUID();
+const otherMembership = randomUUID();
 
 if (!url || !adminKey || !publicKey) {
   throw new Error('Missing local integration fixture configuration');
@@ -93,6 +96,7 @@ describe('Model integration with local Supabase', () => {
       email: userEmail,
       password: testPassword,
       email_confirm: true,
+      user_metadata: { username: `integration-${randomUUID()}` },
     });
 
     if (error) {
@@ -109,6 +113,7 @@ describe('Model integration with local Supabase', () => {
       email: otherUserEmail,
       password: testPassword,
       email_confirm: true,
+      user_metadata: { username: `integration-other-${randomUUID()}` },
     });
 
     if (otherError) {
@@ -133,9 +138,24 @@ describe('Model integration with local Supabase', () => {
     await admin
       .from('memberships')
       .insert([
-        { group_id: groupA, user_id: userId },
-        { group_id: groupB, user_id: userId },
-        { group_id: otherGroup, user_id: otherUserId },
+        {
+          id: membershipA,
+          group_id: groupA,
+          user_id: userId,
+          willing_to_host: true,
+        },
+        {
+          id: membershipB,
+          group_id: groupB,
+          user_id: userId,
+          willing_to_host: true,
+        },
+        {
+          id: otherMembership,
+          group_id: otherGroup,
+          user_id: otherUserId,
+          willing_to_host: true,
+        },
       ])
       .throwOnError();
 
@@ -164,18 +184,24 @@ describe('Model integration with local Supabase', () => {
           group_id: groupA,
           location_id: locationA,
           starts_at: '2030-06-20T18:00:00Z',
+          duration_minutes: 180,
+          planned_host_membership_id: membershipA,
         },
         {
           id: earlySession,
           group_id: groupA,
           location_id: locationA,
           starts_at: '2030-06-10T18:00:00Z',
+          duration_minutes: null,
+          planned_host_membership_id: membershipA,
         },
         {
           id: otherSession,
           group_id: otherGroup,
           location_id: otherLocation,
           starts_at: '2030-06-01T18:00:00Z',
+          duration_minutes: 120,
+          planned_host_membership_id: otherMembership,
         },
       ])
       .throwOnError();
@@ -240,8 +266,16 @@ describe('Model integration with local Supabase', () => {
     expect(groups).toHaveLength(2);
     expect(groups).toEqual(
       expect.arrayContaining([
-        { id: groupA, name: 'Integration A' },
-        { id: groupB, name: 'Integration B' },
+        {
+          id: groupA,
+          name: 'Integration A',
+          admin_membership_id: null,
+        },
+        {
+          id: groupB,
+          name: 'Integration B',
+          admin_membership_id: null,
+        },
       ]),
     );
   });
@@ -256,6 +290,7 @@ describe('Model integration with local Supabase', () => {
     const sessions = await getSessionsForGroup(groupA);
 
     expect(sessions.map((session) => session.id)).toEqual([earlySession, lateSession]);
+    expect(sessions.map((session) => session.duration_minutes)).toEqual([null, 180]);
 
     for (const session of sessions) {
       expect(session.group_id).toBe(groupA);
