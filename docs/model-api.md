@@ -1,6 +1,6 @@
 # Model-API – User Story 1 und 2 und gemeinsame Grundlagen
 
-Stand: 08.11.2026. US2 ist auf dem Feature-Branch lokal implementiert und getestet.
+Stand: 08.11.2026. Das Model und die Datenbank für US2 sind lokal implementiert und geprüft.
 Profile sind eine zusätzliche gemeinsame technische Grundlage, keine US2-Anforderung.
 
 Der Controller importiert ausschließlich aus `@model`.
@@ -167,7 +167,7 @@ Mitglieder derselben Gruppe sein. Nicht aufgeführte Positionen bleiben erhalten
   und `host_position` bleibt `null`.
 - Eine frühere Administratorrolle wird nicht wiederhergestellt.
 
-Die Aufnahme setzt einen bestehenden Auth-Account voraus.
+Für `admitGroupMember` muss der Aufrufer die `userId` eines bestehenden Auth-Kontos kennen.
 Öffentliche Gruppensuche, Selbstbeitritt und Beitrittsanfragen sind in dieser
 Schnittstelle nicht implementiert.
 
@@ -191,9 +191,8 @@ Mitgliedschaft deaktiviert, ihre Hosting-Position geleert und ihre Historie erha
 Beim Austritt des letzten aktiven Mitglieds werden Gruppe, Sessions, Orte und
 alle Mitgliedschaften atomar gelöscht, einschließlich inaktiver Mitgliedschaften.
 Auth-Accounts, Profile und Daten anderer Gruppen bleiben erhalten.
-Die Gruppensperre schützt die Prüfung vor gleichzeitiger Aufnahme oder Austritt.
-Beitrittszeit und Administratorreferenz werden davor geprüft; ein veralteter
-Aufruf liefert `PT409`, ohne Gruppendaten zu löschen.
+Unter der Gruppensperre prüft die Operation Beitrittszeit und Administratorreferenz
+und meldet bei veralteten Erwartungswerten `PT409`.
 
 `leaveGroup` liefert jetzt statt einer einzelnen `Membership` den exportierten
 Typ `LeaveGroupResult`. Die Eingaben bleiben unverändert:

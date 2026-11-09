@@ -112,14 +112,10 @@ npm run supabase -- db reset --local
 
 Verhalten lokal prüfen, `npm run check` und `npm run test:integration` ausführen
 und Migrationen mit dem zugehörigen Code zum Review geben.
-Bereits angewendete Migrationen nicht nachträglich ändern;
-Korrekturen als neue Migrationen anlegen.
+Korrekturen an bereits gemeinsam genutzten Migrationen als neue Migrationen anlegen.
+Rein lokale Migrationen können vor der gemeinsamen Nutzung überarbeitet werden.
+Den vollständigen Neuaufbau anschließend lokal prüfen.
 
-Ausnahme in diesem noch nicht gemeinsam verwendeten US2-Arbeitsstand:
-Die Dauer wurde am 08.11.2026 in die ursprünglichen lokalen US2-Migrationen
-aufgenommen. Die zusätzliche, nicht angewendete Duration-Migration wurde
-entfernt und die lokale Testdatenbank vollständig neu aufgebaut.
-Die bereits gemeinsam genutzten Migrationen aus `main` bleiben unverändert.
 `20261104220141_fix_hosting_conflict_errors.sql` erwartet weiterhin die
 ursprünglichen `40001`-Definitionen und ersetzt sie beim Aufbau durch `PT409`.
 
@@ -155,8 +151,9 @@ stoppen und die Historien vergleichen, nicht die Cloud zurücksetzen oder Migrat
 
 Migrationen übertragen keine Benutzerkonten oder Testdaten.
 Nach dem Deployment stellt Mohammad bestätigte Testkonten und eine Testgruppe
-mit Mitgliedschaften, Ort und Session-Terminen bereit.
-Die Zugangsdaten werden privat geteilt.
+mit Mitgliedschaften, Ort und Session-Terminen bereit. Neue Testkonten über `signUp`
+mit Benutzername anlegen. Beim Anlegen über die Auth Admin API
+`user_metadata.username` setzen. Die Zugangsdaten werden privat geteilt.
 
 Weiterführend:
 [Lokale Entwicklung](https://supabase.com/docs/guides/local-development/overview),
@@ -192,6 +189,7 @@ Die Tests erstellen eigene Daten und entfernen sie anschließend. Sie prüfen:
 - Model-Anmeldung, Gruppenfilter, Session-Reihenfolge und zugehörige Orte.
 - RLS, gesperrte direkte App-Schreibzugriffe und geschützte RPC-Berechtigungen.
 - Aktive und historische Mitgliedschaften, Aufnahme, Austritt und Wiedereintritt.
+- Gruppenlöschung beim letzten aktiven Austritt und persönliche Absagen zu geplanten Sessions.
 - Hosting-Positionen, Hostreferenzen, Bestätigung und atomaren Rollback.
 - Speichern, Lesen und Ändern der Dauer einschließlich 30 und 1440 Minuten,
   ungültige Werte, `NULL`-Altdaten und unvollständige Snapshots.
